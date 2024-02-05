@@ -1,0 +1,14 @@
+# 主要用于提出想要的需求
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: webook-mysql-pvc
+spec:
+  # 需要与 PersistentVolume 中的一致，用于绑定
+  storageClassName: record
+  # 需要以读写一次的方式访问
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi

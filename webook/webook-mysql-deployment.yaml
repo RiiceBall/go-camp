@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webook-mysql-deployment
+  labels:
+    app: webook-mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: webook-mysql
+  template:
+    metadata:
+      labels:
+        app: webook-mysql
+    spec:
+      containers:
+      - name: webook-mysql
+        image: mysql:8.0
+        env:
+          - name: MYSQL_ROOT_PASSWORD
+            value: root
+        ports:
+          - containerPort: 3306
+        volumeMounts:
+          - mountPath: /mysql
+            name: mysql-storage
+      volumes:
+        - name: mysql-storage
+          persistentVolumeClaim:
+            # 需要对于 pvc 的名称
+            claimName: webook-mysql-pvc

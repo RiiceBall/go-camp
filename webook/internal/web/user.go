@@ -11,6 +11,7 @@ import (
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 const (
@@ -18,6 +19,8 @@ const (
 	passwordRegexPattern = `^(?=.*[A-Za-z])(?=.*\d)(?=.*[$@$!%*#?&])[A-Za-z\d$@$!%*#?&]{8,}$`
 	UserIdKey            = "userId"
 )
+
+var JWTKey = []byte("WiXLWadWG44Rr2qP6VUDLod0dzAnRI45")
 
 type UserHandler struct {
 	emailRegexExp    *regexp.Regexp
@@ -107,17 +110,31 @@ func (uh *UserHandler) Login(ctx *gin.Context) {
 	user, err := uh.userService.Login(ctx, req.Email, req.Password)
 	switch err {
 	case nil:
-		sess := sessions.Default(ctx)
-		sess.Set(UserIdKey, user.Id)
-		sess.Options(sessions.Options{
-			// 900 seconds
-			MaxAge: 900,
-		})
-		err = sess.Save()
+		// sess := sessions.Default(ctx)
+		// sess.Set(UserIdKey, user.Id)
+		// sess.Options(sessions.Options{
+		// 	// 900 seconds
+		// 	MaxAge: 900,
+		// })
+		// err = sess.Save()
+		// if err != nil {
+		// 	ctx.String(http.StatusOK, "系统错误")
+		// 	return
+		// }
+		uc := UserClaims{
+			Uid:       user.Id,
+			UserAgent: ctx.GetHeader("User-Agent"),
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute * 30)),
+			},
+		}
+		token := jwt.NewWithClaims(jwt.SigningMethodHS512, uc)
+		tokenStr, err := token.SignedString(JWTKey)
 		if err != nil {
 			ctx.String(http.StatusOK, "系统错误")
 			return
 		}
+		ctx.Header("x-jwt-token", tokenStr)
 		ctx.String(http.StatusOK, "登录成功")
 	case service.ErrInvalidUserOrPassword:
 		ctx.String(http.StatusOK, "用户名或者密码不对")
@@ -167,9 +184,10 @@ func (uh *UserHandler) Edit(ctx *gin.Context) {
 }
 
 func (uh *UserHandler) Profile(ctx *gin.Context) {
-	sess := sessions.Default(ctx)
-	userId := sess.Get(UserIdKey)
-	user, err := uh.userService.GetProfile(ctx, userId.(int64))
+	// sess := sessions.Default(ctx)
+	// userId := sess.Get(UserIdKey)
+	uc := ctx.MustGet("user").(UserClaims)
+	user, err := uh.userService.GetProfile(ctx, uc.Uid)
 	if err != nil {
 		ctx.String(http.StatusOK, "系统异常")
 		return
@@ -205,4 +223,10 @@ type UserInfo struct {
 	Email    string
 	Birthday string
 	AboutMe  string
+}
+
+type UserClaims struct {
+	jwt.RegisteredClaims
+	Uid       int64
+	UserAgent string
 }

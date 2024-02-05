@@ -1,0 +1,16 @@
+# 主要用于说明这是一个什么样的存储结构
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: webook-mysql-pv
+spec:
+  # 需要与 PersistentVolumeClaim 中的一致，用于绑定
+  storageClassName: record
+  # 支持的访问方式
+  accessModes:
+    - ReadWriteOnce
+  capacity:
+    storage: 1Gi
+  # 该 PV 存储的地址
+  hostPath:
+    path: "/mnt/data"
