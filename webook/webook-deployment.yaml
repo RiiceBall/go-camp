@@ -5,8 +5,8 @@ metadata:
   labels:
     app: webook
 spec:
-  # 需要创建 3 个pods
-  replicas: 3
+  # 需要创建 2 个pods
+  replicas: 2
   # 根据 label 来匹配 pods
   selector:
     matchLabels:

@@ -31,7 +31,7 @@ func main() {
 		ctx.String(http.StatusOK, "Hello world")
 	})
 
-	server.Run(":8080")
+	server.Run(":8081")
 }
 
 func initDB() *gorm.DB {

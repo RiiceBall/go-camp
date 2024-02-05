@@ -11,6 +11,6 @@ spec:
   - name: http
     protocol: TCP
     port: 98
-    targetPort: 8080
+    targetPort: 8081
   # 负载均衡
   type: ClusterIP
