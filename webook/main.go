@@ -6,11 +6,13 @@ import (
 	"time"
 	"webook/config"
 	"webook/internal/repository"
+	"webook/internal/repository/cache"
 	"webook/internal/repository/dao"
 	"webook/internal/service"
+	"webook/internal/service/sms"
+	"webook/internal/service/sms/localsms"
 	"webook/internal/web"
 	"webook/internal/web/middleware"
-	"webook/pkg/ginx/middleware/ratelimit"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
@@ -24,8 +26,12 @@ import (
 
 func main() {
 	db := initDB()
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: config.Config.Redis.Addr,
+	})
 	server := initWebServer()
-	initUser(server, db)
+	codeService := initCodeService(redisClient)
+	initUser(server, db, redisClient, codeService)
 
 	server.GET("/hello", func(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "Hello world")
@@ -60,10 +66,10 @@ func initWebServer() *gin.Engine {
 		MaxAge: 12 * time.Hour,
 	}))
 
-	redisClient := redis.NewClient(&redis.Options{
-		Addr: config.Config.Redis.Addr,
-	})
-	server.Use(ratelimit.NewBuilder(redisClient, time.Second, 100).Build())
+	// redisClient := redis.NewClient(&redis.Options{
+	// 	Addr: config.Config.Redis.Addr,
+	// })
+	// server.Use(ratelimit.NewBuilder(redisClient, time.Second, 100).Build())
 
 	useJWT(server)
 	// useSession(server)
@@ -71,12 +77,24 @@ func initWebServer() *gin.Engine {
 	return server
 }
 
-func initUser(server *gin.Engine, db *gorm.DB) {
+func initUser(server *gin.Engine, db *gorm.DB, cmd redis.Cmdable, cs *service.CodeService) {
 	ud := dao.NewUserDAO(db)
-	ur := repository.NewUserRepository(ud)
+	uc := cache.NewUserCache(cmd)
+	ur := repository.NewUserRepository(ud, uc)
 	us := service.NewUserService(ur)
-	uh := web.NewUserHandler(us)
+	uh := web.NewUserHandler(us, cs)
 	uh.RegisterRoutes(server)
+}
+
+func initCodeService(cmd redis.Cmdable) *service.CodeService {
+	cc := cache.NewCodeCache(cmd)
+	cr := repository.NewCodeRepository(cc)
+	cs := service.NewCodeService(cr, initMemorySms())
+	return cs
+}
+
+func initMemorySms() sms.Service {
+	return localsms.NewService()
 }
 
 func useJWT(server *gin.Engine) {

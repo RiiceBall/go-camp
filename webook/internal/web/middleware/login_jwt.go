@@ -17,7 +17,8 @@ type LoginJWTMiddlewareBuilder struct {
 func (lmb *LoginJWTMiddlewareBuilder) CheckLogin() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		path := ctx.Request.URL.Path
-		if (path == "/users/signup") || (path == "/users/login") {
+		if (path == "/users/signup") || (path == "/users/login") ||
+			(path == "/users/login_sms/code/send") || (path == "/users/login_sms") {
 			return
 		}
 		authCode := ctx.GetHeader("Authorization")
@@ -48,11 +49,11 @@ func (lmb *LoginJWTMiddlewareBuilder) CheckLogin() gin.HandlerFunc {
 			return
 		}
 
-		if uc.UserAgent != ctx.GetHeader("User-Agent") {
-			// 能进入这里的大概率是攻击者，以后要埋点（记录日志）
-			ctx.AbortWithStatus(http.StatusUnauthorized)
-			return
-		}
+		// if uc.UserAgent != ctx.GetHeader("User-Agent") {
+		// 	// 能进入这里的大概率是攻击者，以后要埋点（记录日志）
+		// 	ctx.AbortWithStatus(http.StatusUnauthorized)
+		// 	return
+		// }
 
 		expireTime := uc.ExpiresAt
 		now := time.Now()

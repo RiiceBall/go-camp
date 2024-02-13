@@ -2,6 +2,7 @@ package dao
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"time"
 
@@ -10,8 +11,8 @@ import (
 )
 
 var (
-	ErrUserDuplicateEmail = errors.New("邮箱冲突")
-	ErrRecordNotFound     = gorm.ErrRecordNotFound
+	ErrDuplicateUser  = errors.New("邮箱冲突")
+	ErrRecordNotFound = gorm.ErrRecordNotFound
 )
 
 type UserDAO struct {
@@ -32,7 +33,7 @@ func (ud *UserDAO) Insert(ctx context.Context, user User) error {
 	if me, ok := err.(*mysql.MySQLError); ok {
 		const uniqueIndexErrNo uint16 = 1062
 		if me.Number == uniqueIndexErrNo {
-			return ErrUserDuplicateEmail
+			return ErrDuplicateUser
 		}
 	}
 	return err
@@ -50,6 +51,12 @@ func (ud *UserDAO) FindById(ctx context.Context, id int64) (User, error) {
 	return u, err
 }
 
+func (ud *UserDAO) FindByPhone(ctx context.Context, phone string) (User, error) {
+	var u User
+	err := ud.db.WithContext(ctx).Where("phone = ?", phone).First(&u).Error
+	return u, err
+}
+
 func (ud *UserDAO) UpdateById(ctx context.Context, id int64, nickname string, birthday string, aboutMe string) error {
 	return ud.db.WithContext(ctx).Model(&User{}).Where("id = ?", id).Updates(User{
 		Nickname: nickname,
@@ -61,7 +68,8 @@ func (ud *UserDAO) UpdateById(ctx context.Context, id int64, nickname string, bi
 type User struct {
 	Id int64 `gorm:"primaryKey,autoIncrement"`
 	// 创建唯一索引
-	Email    string `gorm:"unique"`
+	Email    sql.NullString `gorm:"unique"`
+	Phone    sql.NullString `gorm:"unique"`
 	Password string
 	Nickname string `gorm:"type=varchar(16)"`
 	Birthday string
