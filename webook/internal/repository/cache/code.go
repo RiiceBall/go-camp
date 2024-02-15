@@ -5,60 +5,72 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
-
-	"github.com/redis/go-redis/v9"
+	"sync"
+	"time"
 )
 
 var (
-	//go:embed lua/set_code.lua
-	luaSetCode string
-	//go:embed lua/verify_code.lua
-	luaVerifyCode string
-
 	ErrCodeSendTooMany   = errors.New("发送太频繁")
 	ErrCodeVerifyTooMany = errors.New("发送太频繁")
+	ErrCodeNotSended     = errors.New("未发送验证码")
 )
 
 type CodeCache struct {
-	cmd redis.Cmdable
+	lock       sync.Mutex
+	cache      map[string]*CacheItem
+	expiration time.Duration
 }
 
-func NewCodeCache(cmd redis.Cmdable) *CodeCache {
+type CacheItem struct {
+	Code       string
+	Count      int
+	Expiration time.Time
+}
+
+func NewCodeCache(cache map[string]*CacheItem) *CodeCache {
 	return &CodeCache{
-		cmd: cmd,
+		cache:      cache,
+		expiration: time.Minute * 10,
 	}
 }
 
 func (c *CodeCache) Set(ctx context.Context, biz string,
 	phone string, code string) error {
-	res, err := c.cmd.Eval(ctx, luaSetCode, []string{biz, phone}, code).Int()
-	if err != nil {
-		return err
-	}
-	switch res {
-	case -1:
-		return errors.New("验证码存在，但是没有过期时间")
-	case -2:
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	key := c.key(biz, phone)
+	item, found := c.cache[key]
+	// 如果找到并且剩余时间超过 9 分钟，则返回错误
+	if found && item.Expiration.Sub(time.Now()) > time.Minute*9 {
 		return ErrCodeSendTooMany
-	default:
-		return nil
 	}
+	c.cache[key] = &CacheItem{
+		Code:       code,
+		Count:      3,
+		Expiration: time.Now().Add(c.expiration),
+	}
+	return nil
 }
 
 func (c *CodeCache) Verify(ctx context.Context, biz string,
 	phone string, code string) (bool, error) {
-	res, err := c.cmd.Eval(ctx, luaVerifyCode, []string{biz, phone}, code).Int()
-	if err != nil {
-		return false, err
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	key := c.key(biz, phone)
+	item, found := c.cache[key]
+	// 如果没找到
+	if !found {
+		return false, ErrCodeNotSended
 	}
-	switch res {
-	case -1:
+	// 如果次数耗尽或是密码错误
+	if item.Count <= 0 || item.Code != code {
+		item.Count--
 		return false, ErrCodeVerifyTooMany
-	case -2:
-		return false, nil
-	default:
-		return true, nil
 	}
+	// 密码正确，将次数清零
+	item.Count = 0
+	return true, nil
 }
 
 func (c *CodeCache) key(biz string, phone string) string {

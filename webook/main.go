@@ -30,7 +30,8 @@ func main() {
 		Addr: config.Config.Redis.Addr,
 	})
 	server := initWebServer()
-	codeService := initCodeService(redisClient)
+	cacheItems := make(map[string]*cache.CacheItem)
+	codeService := initCodeService(cacheItems)
 	initUser(server, db, redisClient, codeService)
 
 	server.GET("/hello", func(ctx *gin.Context) {
@@ -86,8 +87,8 @@ func initUser(server *gin.Engine, db *gorm.DB, cmd redis.Cmdable, cs *service.Co
 	uh.RegisterRoutes(server)
 }
 
-func initCodeService(cmd redis.Cmdable) *service.CodeService {
-	cc := cache.NewCodeCache(cmd)
+func initCodeService(cacheItems map[string]*cache.CacheItem) *service.CodeService {
+	cc := cache.NewCodeCache(cacheItems)
 	cr := repository.NewCodeRepository(cc)
 	cs := service.NewCodeService(cr, initMemorySms())
 	return cs
