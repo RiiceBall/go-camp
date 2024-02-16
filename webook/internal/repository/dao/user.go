@@ -15,17 +15,25 @@ var (
 	ErrRecordNotFound = gorm.ErrRecordNotFound
 )
 
-type UserDAO struct {
+type UserDAO interface {
+	Insert(ctx context.Context, user User) error
+	FindByEmail(ctx context.Context, email string) (User, error)
+	FindById(ctx context.Context, id int64) (User, error)
+	FindByPhone(ctx context.Context, phone string) (User, error)
+	UpdateById(ctx context.Context, id int64, nickname string, birthday string, aboutMe string) error
+}
+
+type GORMUserDAO struct {
 	db *gorm.DB
 }
 
-func NewUserDAO(db *gorm.DB) *UserDAO {
-	return &UserDAO{
+func NewUserDAO(db *gorm.DB) UserDAO {
+	return &GORMUserDAO{
 		db: db,
 	}
 }
 
-func (ud *UserDAO) Insert(ctx context.Context, user User) error {
+func (ud *GORMUserDAO) Insert(ctx context.Context, user User) error {
 	now := time.Now().UnixMilli()
 	user.Ctime = now
 	user.Utime = now
@@ -39,25 +47,25 @@ func (ud *UserDAO) Insert(ctx context.Context, user User) error {
 	return err
 }
 
-func (ud *UserDAO) FindByEmail(ctx context.Context, email string) (User, error) {
+func (ud *GORMUserDAO) FindByEmail(ctx context.Context, email string) (User, error) {
 	var u User
 	err := ud.db.WithContext(ctx).Where("email = ?", email).First(&u).Error
 	return u, err
 }
 
-func (ud *UserDAO) FindById(ctx context.Context, id int64) (User, error) {
+func (ud *GORMUserDAO) FindById(ctx context.Context, id int64) (User, error) {
 	var u User
 	err := ud.db.WithContext(ctx).Where("id = ?", id).First(&u).Error
 	return u, err
 }
 
-func (ud *UserDAO) FindByPhone(ctx context.Context, phone string) (User, error) {
+func (ud *GORMUserDAO) FindByPhone(ctx context.Context, phone string) (User, error) {
 	var u User
 	err := ud.db.WithContext(ctx).Where("phone = ?", phone).First(&u).Error
 	return u, err
 }
 
-func (ud *UserDAO) UpdateById(ctx context.Context, id int64, nickname string, birthday string, aboutMe string) error {
+func (ud *GORMUserDAO) UpdateById(ctx context.Context, id int64, nickname string, birthday string, aboutMe string) error {
 	return ud.db.WithContext(ctx).Model(&User{}).Where("id = ?", id).Updates(User{
 		Nickname: nickname,
 		Birthday: birthday,

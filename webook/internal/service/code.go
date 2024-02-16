@@ -8,21 +8,26 @@ import (
 	"webook/internal/service/sms"
 )
 
-type CodeService struct {
-	cr *repository.CodeRepository
+type CodeService interface {
+	Send(ctx context.Context, biz string, phone string) error
+	Verify(ctx context.Context, biz string, phone string, inputCode string) (bool, error)
+}
+
+type codeService struct {
+	cr repository.CodeRepository
 	ss sms.Service
 }
 
 var ErrCodeSendTooMany = repository.ErrCodeSendTooMany
 
-func NewCodeService(cr *repository.CodeRepository, ss sms.Service) *CodeService {
-	return &CodeService{
+func NewCodeService(cr repository.CodeRepository, ss sms.Service) CodeService {
+	return &codeService{
 		cr: cr,
 		ss: ss,
 	}
 }
 
-func (cs *CodeService) Send(ctx context.Context, biz string, phone string) error {
+func (cs *codeService) Send(ctx context.Context, biz string, phone string) error {
 	code := cs.generate()
 	err := cs.cr.Set(ctx, biz, phone, code)
 	if err != nil {
@@ -32,7 +37,7 @@ func (cs *CodeService) Send(ctx context.Context, biz string, phone string) error
 	return cs.ss.Send(ctx, codeTplId, []string{code}, phone)
 }
 
-func (cs *CodeService) Verify(ctx context.Context,
+func (cs *codeService) Verify(ctx context.Context,
 	biz string, phone string, inputCode string) (bool, error) {
 	ok, err := cs.cr.Verify(ctx, biz, phone, inputCode)
 	if err == repository.ErrCodeVerifyTooMany {
@@ -42,7 +47,7 @@ func (cs *CodeService) Verify(ctx context.Context,
 	return ok, err
 }
 
-func (cs *CodeService) generate() string {
+func (cs *codeService) generate() string {
 	// 0-999999
 	code := rand.Intn(1000000)
 	return fmt.Sprintf("%06d", code)

@@ -26,11 +26,11 @@ var JWTKey = []byte("WiXLWadWG44Rr2qP6VUDLod0dzAnRI45")
 type UserHandler struct {
 	emailRegexExp    *regexp.Regexp
 	passwordRegexExp *regexp.Regexp
-	userService      *service.UserService
-	codeService      *service.CodeService
+	userService      service.UserService
+	codeService      service.CodeService
 }
 
-func NewUserHandler(userService *service.UserService, codeService *service.CodeService) *UserHandler {
+func NewUserHandler(userService service.UserService, codeService service.CodeService) *UserHandler {
 	return &UserHandler{
 		emailRegexExp:    regexp.MustCompile(emailRegexPattern, regexp.None),
 		passwordRegexExp: regexp.MustCompile(passwordRegexPattern, regexp.None),
