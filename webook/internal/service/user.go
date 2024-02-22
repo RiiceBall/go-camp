@@ -46,11 +46,14 @@ func (us *userService) Login(ctx context.Context, email string, password string)
 	if err == repository.ErrUserNotFound {
 		return domain.User{}, ErrInvalidUserOrPassword
 	}
+	if err != nil {
+		return domain.User{}, err
+	}
 	err = bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password))
 	if err != nil {
 		return domain.User{}, ErrInvalidUserOrPassword
 	}
-	return u, err
+	return u, nil
 }
 
 func (us *userService) Edit(ctx context.Context, userId int64, nickname string, birthday string, aboutMe string) error {

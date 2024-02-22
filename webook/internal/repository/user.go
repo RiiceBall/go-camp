@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"time"
 	"webook/internal/domain"
 	"webook/internal/repository/cache"
 	"webook/internal/repository/dao"
@@ -90,6 +91,7 @@ func (ur *CachedUserRepository) toDomain(user dao.User) domain.User {
 		Nickname: user.Nickname,
 		Birthday: user.Birthday,
 		AboutMe:  user.AboutMe,
+		Ctime:    time.UnixMilli(user.Ctime),
 	}
 }
 

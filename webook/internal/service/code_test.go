@@ -5,6 +5,6 @@ import (
 	"testing"
 )
 
-func TestPasswordEncrypt(t *testing.T) {
+func TestFormat(t *testing.T) {
 	t.Log(fmt.Sprintf("%06d", 1))
 }

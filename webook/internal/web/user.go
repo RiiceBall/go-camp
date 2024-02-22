@@ -132,7 +132,6 @@ func (uh *UserHandler) SignUp(ctx *gin.Context) {
 
 	var req SignUpReq
 	if err := ctx.Bind(&req); err != nil {
-		ctx.String(http.StatusOK, "系统错误")
 		return
 	}
 

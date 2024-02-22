@@ -3,6 +3,7 @@ module webook
 go 1.21.5
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/dlclark/regexp2 v1.10.0
 	github.com/ecodeclub/ekit v0.0.8
 	github.com/gin-contrib/cors v1.5.0
@@ -15,6 +16,7 @@ require (
 	github.com/stretchr/testify v1.8.4
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.0.857
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/sms v1.0.857
+	go.uber.org/mock v0.4.0
 	golang.org/x/crypto v0.18.0
 	gorm.io/driver/mysql v1.5.2
 	gorm.io/gorm v1.25.6
