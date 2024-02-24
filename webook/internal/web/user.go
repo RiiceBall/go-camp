@@ -64,6 +64,7 @@ func (uh *UserHandler) SendSMSLoginCode(ctx *gin.Context) {
 			Code: 4,
 			Msg:  "请输入手机号",
 		})
+		return
 	}
 	err := uh.codeService.Send(ctx, bizLogin, req.Phone)
 	switch err {
