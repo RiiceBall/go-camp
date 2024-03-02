@@ -21,6 +21,7 @@ type UserDAO interface {
 	FindById(ctx context.Context, id int64) (User, error)
 	FindByPhone(ctx context.Context, phone string) (User, error)
 	UpdateById(ctx context.Context, id int64, nickname string, birthday string, aboutMe string) error
+	FindByWechat(ctx context.Context, openId string) (User, error)
 }
 
 type GORMUserDAO struct {
@@ -73,6 +74,12 @@ func (ud *GORMUserDAO) UpdateById(ctx context.Context, id int64, nickname string
 	}).Error
 }
 
+func (ud *GORMUserDAO) FindByWechat(ctx context.Context, openId string) (User, error) {
+	var u User
+	err := ud.db.WithContext(ctx).Where("wechat_open_id = ?", openId).First(&u).Error
+	return u, err
+}
+
 type User struct {
 	Id int64 `gorm:"primaryKey,autoIncrement"`
 	// 创建唯一索引
@@ -82,6 +89,10 @@ type User struct {
 	Nickname string `gorm:"type=varchar(16)"`
 	Birthday string
 	AboutMe  string `gorm:"type=varchar(1024)"`
+
+	WechatOpenId  sql.NullString `gorm:"unique"`
+	WechatUnionId sql.NullString
+
 	// 创建时间
 	Ctime int64
 	// 更新时间

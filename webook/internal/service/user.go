@@ -20,6 +20,7 @@ type UserService interface {
 	Edit(ctx context.Context, userId int64, nickname string, birthday string, aboutMe string) error
 	GetProfile(ctx context.Context, userId int64) (domain.User, error)
 	FindOrCreate(ctx context.Context, phone string) (domain.User, error)
+	FindOrCreateByWechat(ctx context.Context, wechatInfo domain.WechatInfo) (domain.User, error)
 }
 
 type userService struct {
@@ -77,4 +78,19 @@ func (us *userService) FindOrCreate(ctx context.Context, phone string) (domain.U
 		return domain.User{}, err
 	}
 	return us.ur.FindByPhone(ctx, phone)
+}
+
+func (us *userService) FindOrCreateByWechat(ctx context.Context,
+	wechatInfo domain.WechatInfo) (domain.User, error) {
+	u, err := us.ur.FindByWechat(ctx, wechatInfo.OpenId)
+	if err != repository.ErrUserNotFound {
+		return u, err
+	}
+	err = us.ur.Create(ctx, domain.User{
+		WechatInfo: wechatInfo,
+	})
+	if err != nil && err != repository.ErrDuplicateUser {
+		return domain.User{}, err
+	}
+	return us.ur.FindByWechat(ctx, wechatInfo.OpenId)
 }
