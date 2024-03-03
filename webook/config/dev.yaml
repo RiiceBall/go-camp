@@ -1,0 +1,8 @@
+test:
+  key: 12
+
+redis:
+  addr: "localhost:6379"
+
+db:
+  dsn: "root:root@tcp(localhost:3306)/webook"
