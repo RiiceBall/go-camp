@@ -1,17 +1,21 @@
 package middleware
 
 import (
-	"log"
 	"net/http"
-	"strings"
-	"time"
-	"webook/internal/web"
+	ijwt "webook/internal/web/jwt"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
 
 type LoginJWTMiddlewareBuilder struct {
+	ijwt.Handler
+}
+
+func NewLoginJWTMiddlewareBuilder(hdl ijwt.Handler) *LoginJWTMiddlewareBuilder {
+	return &LoginJWTMiddlewareBuilder{
+		Handler: hdl,
+	}
 }
 
 func (lmb *LoginJWTMiddlewareBuilder) CheckLogin() gin.HandlerFunc {
@@ -22,53 +26,28 @@ func (lmb *LoginJWTMiddlewareBuilder) CheckLogin() gin.HandlerFunc {
 			(path == "/oauth2/wechat/authurl") || (path == "/oauth2/wechat/callback") {
 			return
 		}
-		authCode := ctx.GetHeader("Authorization")
-		if authCode == "" {
-			// 没登陆，没有 Authorization
-			ctx.AbortWithStatus(http.StatusUnauthorized)
-			return
-		}
-		segs := strings.Split(authCode, " ")
-		if len(segs) != 2 {
-			// Authorization 是乱传的，格式不对
-			ctx.AbortWithStatus(http.StatusUnauthorized)
-			return
-		}
-		tokenStr := segs[1]
-		var uc web.UserClaims
+		tokenStr := lmb.ExtractToken(ctx)
+		var uc ijwt.UserClaims
 		token, err := jwt.ParseWithClaims(tokenStr, &uc, func(token *jwt.Token) (interface{}, error) {
-			return web.JWTKey, nil
+			return ijwt.JWTKey, nil
 		})
 		if err != nil {
 			// token 有问题
 			ctx.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
-		if !token.Valid {
+		if token == nil || !token.Valid {
 			// token 成功解析，但是非法或是过期了
 			ctx.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
 
-		// if uc.UserAgent != ctx.GetHeader("User-Agent") {
-		// 	// 能进入这里的大概率是攻击者，以后要埋点（记录日志）
-		// 	ctx.AbortWithStatus(http.StatusUnauthorized)
-		// 	return
-		// }
-
-		expireTime := uc.ExpiresAt
-		now := time.Now()
-		if expireTime.Sub(now) < time.Minute*10 {
-			uc.ExpiresAt = jwt.NewNumericDate(now.Add(time.Minute * 30))
-			println(tokenStr)
-			newTokenStr, err := token.SignedString(web.JWTKey)
-			println(newTokenStr)
-			ctx.Header("x-jwt-token", newTokenStr)
-			println("go")
-			if err != nil {
-				log.Println(err)
-			}
+		err = lmb.CheckSession(ctx, uc.Ssid)
+		if err != nil {
+			ctx.AbortWithStatus(http.StatusUnauthorized)
+			return
 		}
+
 		ctx.Set("user", uc)
 	}
 }
