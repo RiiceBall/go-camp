@@ -6,6 +6,7 @@ import (
 	"webook/internal/domain"
 	"webook/internal/repository"
 
+	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -25,11 +26,13 @@ type UserService interface {
 
 type userService struct {
 	ur repository.UserRepository
+	// logger *zap.Logger
 }
 
 func NewUserService(repo repository.UserRepository) UserService {
 	return &userService{
 		ur: repo,
+		// logger: zap.L(),
 	}
 }
 
@@ -86,6 +89,10 @@ func (us *userService) FindOrCreateByWechat(ctx context.Context,
 	if err != repository.ErrUserNotFound {
 		return u, err
 	}
+	// 这边意味着是一个新用户，所以记录一下
+	// JSON 格式的 wechatInfo
+	zap.L().Info("新用户", zap.Any("wechatInfo", wechatInfo))
+	// us.logger.Info("新用户", zap.Any("wechatInfo", wechatInfo))
 	err = us.ur.Create(ctx, domain.User{
 		WechatInfo: wechatInfo,
 	})

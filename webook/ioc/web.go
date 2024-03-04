@@ -1,6 +1,7 @@
 package ioc
 
 import (
+	"context"
 	"strings"
 	"time"
 	"webook/internal/web"
@@ -8,6 +9,7 @@ import (
 	"webook/internal/web/middleware"
 	"webook/pkg/ginx/middleware/ratelimit"
 	"webook/pkg/limiter"
+	"webook/pkg/logger"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -23,7 +25,8 @@ func InitWebServer(mdls []gin.HandlerFunc, userHdl *web.UserHandler,
 	return server
 }
 
-func InitGinMiddlewares(redisClient redis.Cmdable, hdl ijwt.Handler) []gin.HandlerFunc {
+func InitGinMiddlewares(redisClient redis.Cmdable,
+	hdl ijwt.Handler, l logger.LoggerV1) []gin.HandlerFunc {
 	return []gin.HandlerFunc{
 		cors.New(cors.Config{
 			AllowCredentials: true,
@@ -35,6 +38,9 @@ func InitGinMiddlewares(redisClient redis.Cmdable, hdl ijwt.Handler) []gin.Handl
 			MaxAge: 12 * time.Hour,
 		}),
 		ratelimit.NewBuilder(limiter.NewRedisSlidingWindowLimiter(redisClient, time.Second, 100)).Build(),
+		middleware.NewLogMiddlewareBuilder(func(ctx context.Context, al middleware.AccessLog) {
+			l.Debug("", logger.Field{Key: "req", Val: al})
+		}).AllowReqBody().AllowRespBody().Build(),
 		middleware.NewLoginJWTMiddlewareBuilder(hdl).CheckLogin(),
 	}
 }

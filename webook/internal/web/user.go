@@ -13,6 +13,7 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"go.uber.org/zap"
 )
 
 const (
@@ -77,6 +78,8 @@ func (uh *UserHandler) SendSMSLoginCode(ctx *gin.Context) {
 			Msg: "发送成功",
 		})
 	case service.ErrCodeSendTooMany:
+		// 可能有人不知道怎么就出发了，少数可以接受，频繁出现就代表被攻击了
+		zap.L().Warn("频繁发送验证码")
 		ctx.JSON(http.StatusOK, Result{
 			Code: 4,
 			Msg:  "短信发送太频繁，请稍后再试",
@@ -105,6 +108,11 @@ func (uh *UserHandler) LoginSMS(ctx *gin.Context) {
 			Code: 5,
 			Msg:  "系统错误",
 		})
+		zap.L().Error("手机验证码验证失败",
+			// 在生产环境绝对不能打印敏感信息，比如手机号码，身份证号，邮箱等。
+			// 在开发环境可以，因为一般都是自己的号码或是测试号码
+			zap.String("phone", req.Phone),
+			zap.Error(err))
 		return
 	}
 	if !ok {
