@@ -42,5 +42,6 @@ func InitGinMiddlewares(redisClient redis.Cmdable,
 			l.Debug("", logger.Field{Key: "req", Val: al})
 		}).AllowReqBody().AllowRespBody().Build(),
 		middleware.NewLoginJWTMiddlewareBuilder(hdl).CheckLogin(),
+		middleware.ErrorHandler(),
 	}
 }

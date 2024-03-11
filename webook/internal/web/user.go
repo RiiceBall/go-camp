@@ -104,15 +104,17 @@ func (uh *UserHandler) LoginSMS(ctx *gin.Context) {
 
 	ok, err := uh.codeService.Verify(ctx, bizLogin, req.Phone, req.Code)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
-			Code: 5,
-			Msg:  "系统错误",
+		ctx.Error(ErrorResult{
+			Result: Result{
+				Code: 5,
+				Msg:  "系统错误",
+			},
+			ErrorMsg: "手机验证码验证失败",
+			Err:      err,
+			Context: map[string]interface{}{
+				"phone": req.Phone,
+			},
 		})
-		zap.L().Error("手机验证码验证失败",
-			// 在生产环境绝对不能打印敏感信息，比如手机号码，身份证号，邮箱等。
-			// 在开发环境可以，因为一般都是自己的号码或是测试号码
-			zap.String("phone", req.Phone),
-			zap.Error(err))
 		return
 	}
 	if !ok {
@@ -124,15 +126,26 @@ func (uh *UserHandler) LoginSMS(ctx *gin.Context) {
 	}
 	user, err := uh.userService.FindOrCreate(ctx, req.Phone)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
-			Code: 5,
-			Msg:  "系统错误",
+		ctx.Error(ErrorResult{
+			Result: Result{
+				Code: 5,
+				Msg:  "系统错误",
+			},
+			ErrorMsg: "用户查找或创建失败",
+			Err:      err,
 		})
 		return
 	}
 	err = uh.SetLoginToken(ctx, user.Id)
 	if err != nil {
-		ctx.String(http.StatusOK, "系统错误")
+		ctx.Error(ErrorResult{
+			Result: Result{
+				Code: 5,
+				Msg:  "系统错误",
+			},
+			ErrorMsg: "设置登录 token 失败",
+			Err:      err,
+		})
 		return
 	}
 	ctx.JSON(http.StatusOK, Result{
