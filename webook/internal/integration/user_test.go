@@ -11,7 +11,6 @@ import (
 	"time"
 	"webook/internal/integration/startup"
 	"webook/internal/web"
-	"webook/ioc"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -22,7 +21,7 @@ func init() {
 }
 
 func TestUserHandler_SendSMSCode(t *testing.T) {
-	rdb := ioc.InitRedis()
+	rdb := startup.InitRedis()
 	server := startup.InitWebServer()
 
 	testCases := []struct {
