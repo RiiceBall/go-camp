@@ -52,7 +52,7 @@ func (c *RedisCodeCache) Set(ctx context.Context, biz string,
 
 func (c *RedisCodeCache) Verify(ctx context.Context, biz string,
 	phone string, code string) (bool, error) {
-	res, err := c.cmd.Eval(ctx, luaVerifyCode, []string{biz, phone}, code).Int()
+	res, err := c.cmd.Eval(ctx, luaVerifyCode, []string{c.key(biz, phone)}, code).Int()
 	if err != nil {
 		return false, err
 	}

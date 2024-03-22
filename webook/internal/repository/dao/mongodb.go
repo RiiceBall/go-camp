@@ -91,6 +91,21 @@ func (m *MongoDBArticleDAO) SyncStatus(ctx context.Context, uid int64, id int64,
 	return err
 }
 
+func (m *MongoDBArticleDAO) GetByAuthor(ctx context.Context, uid int64, offset int, limit int) ([]Article, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *MongoDBArticleDAO) GetById(ctx context.Context, id int64) (Article, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *MongoDBArticleDAO) GetPubById(ctx context.Context, id int64) (PublishedArticle, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func NewMongoDBArticleDAO(mdb *mongo.Database, node *snowflake.Node) *MongoDBArticleDAO {
 	return &MongoDBArticleDAO{
 		node:    node,

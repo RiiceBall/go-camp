@@ -40,6 +40,51 @@ func (m *MockArticleService) EXPECT() *MockArticleServiceMockRecorder {
 	return m.recorder
 }
 
+// GetByAuthor mocks base method.
+func (m *MockArticleService) GetByAuthor(ctx context.Context, uid int64, offset, limit int) ([]domain.Article, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetByAuthor", ctx, uid, offset, limit)
+	ret0, _ := ret[0].([]domain.Article)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetByAuthor indicates an expected call of GetByAuthor.
+func (mr *MockArticleServiceMockRecorder) GetByAuthor(ctx, uid, offset, limit any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByAuthor", reflect.TypeOf((*MockArticleService)(nil).GetByAuthor), ctx, uid, offset, limit)
+}
+
+// GetById mocks base method.
+func (m *MockArticleService) GetById(ctx context.Context, id int64) (domain.Article, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetById", ctx, id)
+	ret0, _ := ret[0].(domain.Article)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetById indicates an expected call of GetById.
+func (mr *MockArticleServiceMockRecorder) GetById(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetById", reflect.TypeOf((*MockArticleService)(nil).GetById), ctx, id)
+}
+
+// GetPubById mocks base method.
+func (m *MockArticleService) GetPubById(ctx context.Context, id int64) (domain.Article, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPubById", ctx, id)
+	ret0, _ := ret[0].(domain.Article)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPubById indicates an expected call of GetPubById.
+func (mr *MockArticleServiceMockRecorder) GetPubById(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPubById", reflect.TypeOf((*MockArticleService)(nil).GetPubById), ctx, id)
+}
+
 // Publish mocks base method.
 func (m *MockArticleService) Publish(ctx context.Context, art domain.Article) (int64, error) {
 	m.ctrl.T.Helper()
