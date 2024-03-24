@@ -114,14 +114,14 @@ func TestCachedUserRepository_FindById(t *testing.T) {
 				uc.EXPECT().Get(gomock.Any(), uid).
 					Return(domain.User{}, cache.ErrKeyNotExist)
 				ud := daomocks.NewMockUserDAO(ctrl)
-				ud.EXPECT().FindById(gomock.Any(), uid).Return(dao.User{}, dao.ErrRecordNotFound)
+				ud.EXPECT().FindById(gomock.Any(), uid).Return(dao.User{}, dao.ErrDataNotFound)
 
 				return uc, ud
 			},
 			uid:      123,
 			ctx:      context.Background(),
 			wantUser: domain.User{},
-			wantErr:  dao.ErrRecordNotFound,
+			wantErr:  dao.ErrDataNotFound,
 		},
 		{
 			name: "回写缓存失败",

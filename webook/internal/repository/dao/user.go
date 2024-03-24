@@ -11,8 +11,8 @@ import (
 )
 
 var (
-	ErrDuplicateUser  = errors.New("邮箱冲突")
-	ErrRecordNotFound = gorm.ErrRecordNotFound
+	ErrDuplicateUser = errors.New("邮箱冲突")
+	ErrDataNotFound  = gorm.ErrRecordNotFound
 )
 
 type UserDAO interface {
