@@ -3,6 +3,7 @@
 package startup
 
 import (
+	"webook/internal/events/article"
 	"webook/internal/repository"
 	"webook/internal/repository/cache"
 	"webook/internal/repository/dao"
@@ -17,7 +18,9 @@ import (
 
 var thirdPartySet = wire.NewSet( // 第三方依赖
 	InitRedis, InitDB,
-	InitLogger)
+	InitLogger,
+	InitSaramaClient,
+	InitSyncProducer)
 
 var userSvcProvider = wire.NewSet(
 	dao.NewUserDAO,
@@ -51,6 +54,8 @@ func InitWebServer() *gin.Engine {
 		// Repository
 		repository.NewCodeRepository,
 
+		article.NewSaramaSyncProducer,
+
 		// Service
 		ioc.InitSMSService,
 		ioc.InitWechatService,
@@ -77,6 +82,7 @@ func InitArticleHandler(dao dao.ArticleDAO) *web.ArticleHandler {
 		service.NewArticleService,
 		cache.NewArticleRedisCache,
 		web.NewArticleHandler,
+		article.NewSaramaSyncProducer,
 		repository.NewArticleRepository)
 	return &web.ArticleHandler{}
 }

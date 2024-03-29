@@ -1,7 +1,6 @@
 package web
 
 import (
-	"context"
 	"net/http"
 	"strconv"
 	"time"
@@ -255,7 +254,7 @@ func (ah *ArticleHandler) PubDetail(ctx *gin.Context) {
 	uc := ctx.MustGet("user").(jwt.UserClaims)
 	eg.Go(func() error {
 		var er error
-		art, er = ah.as.GetPubById(ctx, id)
+		art, er = ah.as.GetPubById(ctx, id, uc.Uid)
 		return er
 	})
 
@@ -278,15 +277,6 @@ func (ah *ArticleHandler) PubDetail(ctx *gin.Context) {
 			logger.Error(err))
 		return
 	}
-
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
-		er := ah.is.IncrReadCnt(ctx, ah.biz, art.Id)
-		if er != nil {
-			ah.l.Error("增加文章阅读数失败", logger.Error(err))
-		}
-	}()
 
 	ctx.JSON(http.StatusOK, Result{
 		Data: ArticleVo{
