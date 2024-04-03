@@ -6,8 +6,10 @@ import (
 	"time"
 	"unicode/utf8"
 	"webook/internal/domain"
+	"webook/internal/errs"
 	"webook/internal/service"
 	ijwt "webook/internal/web/jwt"
+	"webook/pkg/ginx"
 
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gin-contrib/sessions"
@@ -44,7 +46,7 @@ func NewUserHandler(userService service.UserService, codeService service.CodeSer
 
 func (uh *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug := server.Group("/users")
-	ug.POST("/signup", uh.SignUp)
+	ug.POST("/signup", ginx.WrapReq[SignUpReq](uh.SignUp))
 	ug.POST("/login", uh.Login)
 	ug.POST("/logout", uh.Logout)
 	ug.POST("/edit", uh.Edit)
@@ -65,7 +67,7 @@ func (uh *UserHandler) SendSMSLoginCode(ctx *gin.Context) {
 		return
 	}
 	if req.Phone == "" {
-		ctx.JSON(http.StatusOK, Result{
+		ctx.JSON(http.StatusOK, ginx.Result{
 			Code: 4,
 			Msg:  "请输入手机号",
 		})
@@ -74,18 +76,18 @@ func (uh *UserHandler) SendSMSLoginCode(ctx *gin.Context) {
 	err := uh.codeService.Send(ctx, bizLogin, req.Phone)
 	switch err {
 	case nil:
-		ctx.JSON(http.StatusOK, Result{
+		ctx.JSON(http.StatusOK, ginx.Result{
 			Msg: "发送成功",
 		})
 	case service.ErrCodeSendTooMany:
 		// 可能有人不知道怎么就出发了，少数可以接受，频繁出现就代表被攻击了
 		zap.L().Warn("频繁发送验证码")
-		ctx.JSON(http.StatusOK, Result{
+		ctx.JSON(http.StatusOK, ginx.Result{
 			Code: 4,
 			Msg:  "短信发送太频繁，请稍后再试",
 		})
 	default:
-		ctx.JSON(http.StatusOK, Result{
+		ctx.JSON(http.StatusOK, ginx.Result{
 			Code: 5,
 			Msg:  "系统错误",
 		})
@@ -104,7 +106,7 @@ func (uh *UserHandler) LoginSMS(ctx *gin.Context) {
 
 	ok, err := uh.codeService.Verify(ctx, bizLogin, req.Phone, req.Code)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
+		ctx.JSON(http.StatusOK, ginx.Result{
 			Code: 5,
 			Msg:  "系统错误",
 		})
@@ -116,7 +118,7 @@ func (uh *UserHandler) LoginSMS(ctx *gin.Context) {
 		return
 	}
 	if !ok {
-		ctx.JSON(http.StatusOK, Result{
+		ctx.JSON(http.StatusOK, ginx.Result{
 			Code: 4,
 			Msg:  "验证码不对，请重新输入",
 		})
@@ -124,7 +126,7 @@ func (uh *UserHandler) LoginSMS(ctx *gin.Context) {
 	}
 	user, err := uh.userService.FindOrCreate(ctx, req.Phone)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
+		ctx.JSON(http.StatusOK, ginx.Result{
 			Code: 5,
 			Msg:  "系统错误",
 		})
@@ -135,46 +137,51 @@ func (uh *UserHandler) LoginSMS(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "系统错误")
 		return
 	}
-	ctx.JSON(http.StatusOK, Result{
+	ctx.JSON(http.StatusOK, ginx.Result{
 		Msg: "登陆成功",
 	})
 }
 
-func (uh *UserHandler) SignUp(ctx *gin.Context) {
-	type SignUpReq struct {
-		Email           string `json:"email"`
-		Password        string `json:"password"`
-		ConfirmPassword string `json:"confirmPassword"`
-	}
+type SignUpReq struct {
+	Email           string `json:"email"`
+	Password        string `json:"password"`
+	ConfirmPassword string `json:"confirmPassword"`
+}
 
-	var req SignUpReq
-	if err := ctx.Bind(&req); err != nil {
-		return
-	}
-
+func (uh *UserHandler) SignUp(ctx *gin.Context, req SignUpReq) (ginx.Result, error) {
 	isEmail, err := uh.emailRegexExp.MatchString(req.Email)
 	if err != nil {
-		ctx.String(http.StatusOK, "系统错误")
-		return
+		return ginx.Result{
+			Code: errs.UserInternalServerError,
+			Msg:  "系统错误",
+		}, err
 	}
 	if !isEmail {
-		ctx.String(http.StatusOK, "非法邮箱格式")
-		return
+		return ginx.Result{
+			Code: errs.UserInvalidInput,
+			Msg:  "邮箱输入错误",
+		}, nil
 	}
 
 	if req.Password != req.ConfirmPassword {
-		ctx.String(http.StatusOK, "两次输入密码不对")
-		return
+		return ginx.Result{
+			Code: errs.UserInvalidInput,
+			Msg:  "两次输入密码不对",
+		}, nil
 	}
 
 	isPassword, err := uh.passwordRegexExp.MatchString(req.Password)
 	if err != nil {
-		ctx.String(http.StatusOK, "系统错误")
-		return
+		return ginx.Result{
+			Code: errs.UserInvalidInput,
+			Msg:  "系统错误",
+		}, err
 	}
 	if !isPassword {
-		ctx.String(http.StatusOK, "密码必须包含字母、数字、特殊字符，并且不少于八位")
-		return
+		return ginx.Result{
+			Code: errs.UserInvalidInput,
+			Msg:  "密码必须包含数字、特殊字符，并且长度不能小于 8 位",
+		}, nil
 	}
 
 	err = uh.userService.SignUp(ctx, domain.User{
@@ -184,11 +191,19 @@ func (uh *UserHandler) SignUp(ctx *gin.Context) {
 
 	switch err {
 	case nil:
-		ctx.String(http.StatusOK, "注册成功")
+		return ginx.Result{
+			Msg: "OK",
+		}, nil
 	case service.ErrDuplicateUser:
-		ctx.String(http.StatusOK, "重复邮箱，请换一个邮箱")
+		return ginx.Result{
+			Code: errs.UserDuplicateEmail,
+			Msg:  "邮箱冲突",
+		}, err
 	default:
-		ctx.String(http.StatusOK, "系统错误")
+		return ginx.Result{
+			Code: errs.UserInternalServerError,
+			Msg:  "系统错误",
+		}, err
 	}
 }
 
@@ -221,13 +236,13 @@ func (uh *UserHandler) Login(ctx *gin.Context) {
 func (uh *UserHandler) Logout(ctx *gin.Context) {
 	err := uh.ClearToken(ctx)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
+		ctx.JSON(http.StatusOK, ginx.Result{
 			Code: 5,
 			Msg:  "系统错误",
 		})
 		return
 	}
-	ctx.JSON(http.StatusOK, Result{
+	ctx.JSON(http.StatusOK, ginx.Result{
 		Msg: "退出成功",
 	})
 }
@@ -317,7 +332,7 @@ func (uh *UserHandler) RefreshToken(ctx *gin.Context) {
 		ctx.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
-	ctx.JSON(http.StatusOK, Result{
+	ctx.JSON(http.StatusOK, ginx.Result{
 		Msg: "OK",
 	})
 }

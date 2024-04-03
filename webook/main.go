@@ -6,6 +6,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	_ "github.com/spf13/viper/remote"
@@ -15,6 +16,7 @@ import (
 func main() {
 	initViper()
 	initLogger()
+	initPrometheus()
 	// initViperRemote()
 	app := InitWebServer()
 	for _, c := range app.consumers {
@@ -30,6 +32,14 @@ func main() {
 	})
 
 	server.Run(":8080")
+}
+
+func initPrometheus() {
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		// 监听 8081 端口，你也可以做成可配置的
+		http.ListenAndServe(":8081", nil)
+	}()
 }
 
 func initLogger() {

@@ -11,6 +11,7 @@ import (
 	"webook/internal/service"
 	svcmocks "webook/internal/service/mocks"
 	ijwt "webook/internal/web/jwt"
+	"webook/pkg/ginx"
 	"webook/pkg/logger"
 
 	"github.com/gin-gonic/gin"
@@ -25,7 +26,7 @@ func TestArticleHandler_Publish(t *testing.T) {
 		reqBody string
 
 		wantCode int
-		wantRes  Result
+		wantRes  ginx.Result
 	}{
 		{
 			name: "新建并发表成功",
@@ -42,7 +43,7 @@ func TestArticleHandler_Publish(t *testing.T) {
 			},
 			reqBody:  `{"title":"我的标题", "content":"我的内容"}`,
 			wantCode: http.StatusOK,
-			wantRes: Result{
+			wantRes: ginx.Result{
 				Data: float64(1),
 			},
 		},
@@ -62,7 +63,7 @@ func TestArticleHandler_Publish(t *testing.T) {
 			},
 			reqBody:  `{"id": 123, "title":"我的标题", "content":"我的内容"}`,
 			wantCode: http.StatusOK,
-			wantRes: Result{
+			wantRes: ginx.Result{
 				Data: float64(123),
 			},
 		},
@@ -81,7 +82,7 @@ func TestArticleHandler_Publish(t *testing.T) {
 			},
 			reqBody:  `{"title":"我的标题", "content":"我的内容"}`,
 			wantCode: http.StatusOK,
-			wantRes: Result{
+			wantRes: ginx.Result{
 				Code: 5,
 				Msg:  "系统错误",
 			},
@@ -125,7 +126,7 @@ func TestArticleHandler_Publish(t *testing.T) {
 				return
 			}
 
-			var res Result
+			var res ginx.Result
 			err = json.NewDecoder(recorder.Body).Decode(&res)
 			assert.NoError(t, err)
 			assert.Equal(t, tc.wantRes, res)

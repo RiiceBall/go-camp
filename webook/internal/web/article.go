@@ -1,12 +1,14 @@
 package web
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 	"webook/internal/domain"
 	"webook/internal/service"
 	"webook/internal/web/jwt"
+	"webook/pkg/ginx"
 	"webook/pkg/logger"
 
 	"github.com/ecodeclub/ekit/slice"
@@ -45,8 +47,8 @@ func (ah *ArticleHandler) RegisterRoutes(server *gin.Engine) {
 	ag.POST("/list", ah.List)
 
 	pub := ag.Group("/pub")
-	pub.GET("/:id", ah.PubDetail)
-	pub.POST("/like", ah.Like)
+	pub.GET("/:id", ginx.WrapClaims(ah.PubDetail))
+	pub.POST("/like", ginx.WrapClaimsAndReq[LikeReq](ah.Like))
 	pub.POST("/collect", ah.Collect)
 }
 
@@ -71,7 +73,7 @@ func (ah *ArticleHandler) Edit(ctx *gin.Context) {
 		},
 	})
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
+		ctx.JSON(http.StatusOK, ginx.Result{
 			Msg: "系统错误",
 		})
 		ah.l.Error("保存文章数据失败",
@@ -79,7 +81,7 @@ func (ah *ArticleHandler) Edit(ctx *gin.Context) {
 			logger.Error(err))
 		return
 	}
-	ctx.JSON(http.StatusOK, Result{
+	ctx.JSON(http.StatusOK, ginx.Result{
 		Data: id,
 	})
 }
@@ -104,7 +106,7 @@ func (ah *ArticleHandler) Publish(ctx *gin.Context) {
 		},
 	})
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
+		ctx.JSON(http.StatusOK, ginx.Result{
 			Code: 5,
 			Msg:  "系统错误",
 		})
@@ -113,7 +115,7 @@ func (ah *ArticleHandler) Publish(ctx *gin.Context) {
 			logger.Error(err))
 		return
 	}
-	ctx.JSON(http.StatusOK, Result{
+	ctx.JSON(http.StatusOK, ginx.Result{
 		Data: id,
 	})
 }
@@ -129,7 +131,7 @@ func (ah *ArticleHandler) Withdraw(ctx *gin.Context) {
 	uc := ctx.MustGet("user").(jwt.UserClaims)
 	err := ah.as.Withdraw(ctx, uc.Uid, req.Id)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
+		ctx.JSON(http.StatusOK, ginx.Result{
 			Msg:  "系统错误",
 			Code: 5,
 		})
@@ -139,7 +141,7 @@ func (ah *ArticleHandler) Withdraw(ctx *gin.Context) {
 			logger.Error(err))
 		return
 	}
-	ctx.JSON(http.StatusOK, Result{
+	ctx.JSON(http.StatusOK, ginx.Result{
 		Msg: "OK",
 	})
 }
@@ -153,7 +155,7 @@ func (ah *ArticleHandler) List(ctx *gin.Context) {
 	uc := ctx.MustGet("user").(jwt.UserClaims)
 	arts, err := ah.as.GetByAuthor(ctx, uc.Uid, page.Offset, page.Limit)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
+		ctx.JSON(http.StatusOK, ginx.Result{
 			Code: 5,
 			Msg:  "系统错误",
 		})
@@ -164,7 +166,7 @@ func (ah *ArticleHandler) List(ctx *gin.Context) {
 			logger.Int64("uid", uc.Uid))
 		return
 	}
-	ctx.JSON(http.StatusOK, Result{
+	ctx.JSON(http.StatusOK, ginx.Result{
 		Data: slice.Map[domain.Article, ArticleVo](arts, func(idx int, src domain.Article) ArticleVo {
 			return ArticleVo{
 				Id:       src.Id,
@@ -186,7 +188,7 @@ func (ah *ArticleHandler) Detail(ctx *gin.Context) {
 	idstr := ctx.Param("id")
 	id, err := strconv.ParseInt(idstr, 10, 64)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
+		ctx.JSON(http.StatusOK, ginx.Result{
 			Msg:  "id 参数错误",
 			Code: 4,
 		})
@@ -197,7 +199,7 @@ func (ah *ArticleHandler) Detail(ctx *gin.Context) {
 	}
 	art, err := ah.as.GetById(ctx, id)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
+		ctx.JSON(http.StatusOK, ginx.Result{
 			Msg:  "系统错误",
 			Code: 5,
 		})
@@ -209,7 +211,7 @@ func (ah *ArticleHandler) Detail(ctx *gin.Context) {
 	uc := ctx.MustGet("user").(jwt.UserClaims)
 	if art.Author.Id != uc.Uid {
 		// 有人在搞鬼
-		ctx.JSON(http.StatusOK, Result{
+		ctx.JSON(http.StatusOK, ginx.Result{
 			Msg:  "系统错误",
 			Code: 5,
 		})
@@ -229,21 +231,18 @@ func (ah *ArticleHandler) Detail(ctx *gin.Context) {
 		Ctime:    art.Ctime.Format(time.DateTime),
 		Utime:    art.Utime.Format(time.DateTime),
 	}
-	ctx.JSON(http.StatusOK, Result{Data: vo})
+	ctx.JSON(http.StatusOK, ginx.Result{Data: vo})
 }
 
-func (ah *ArticleHandler) PubDetail(ctx *gin.Context) {
+func (ah *ArticleHandler) PubDetail(ctx *gin.Context, uc jwt.UserClaims) (ginx.Result, error) {
 	idstr := ctx.Param("id")
 	id, err := strconv.ParseInt(idstr, 10, 64)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
-			Msg:  "id 参数错误",
+		ah.l.Error("前端输入的 ID 不对", logger.Error(err))
+		return ginx.Result{
 			Code: 4,
-		})
-		ah.l.Warn("查询文章失败，id 格式不对",
-			logger.String("id", idstr),
-			logger.Error(err))
-		return
+			Msg:  "参数错误",
+		}, fmt.Errorf("查询文章详情的 ID %s 不正确, %w", idstr, err)
 	}
 
 	var (
@@ -251,7 +250,6 @@ func (ah *ArticleHandler) PubDetail(ctx *gin.Context) {
 		art  domain.Article
 		intr domain.Interactive
 	)
-	uc := ctx.MustGet("user").(jwt.UserClaims)
 	eg.Go(func() error {
 		var er error
 		art, er = ah.as.GetPubById(ctx, id, uc.Uid)
@@ -267,18 +265,13 @@ func (ah *ArticleHandler) PubDetail(ctx *gin.Context) {
 	err = eg.Wait()
 
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
-			Msg:  "系统错误",
+		return ginx.Result{
 			Code: 5,
-		})
-		ah.l.Error("查询文章失败，系统错误",
-			logger.Int64("aid", id),
-			logger.Int64("uid", uc.Uid),
-			logger.Error(err))
-		return
+			Msg:  "系统错误",
+		}, fmt.Errorf("获取文章信息失败 %w", err)
 	}
 
-	ctx.JSON(http.StatusOK, Result{
+	return ginx.Result{
 		Data: ArticleVo{
 			Id:    art.Id,
 			Title: art.Title,
@@ -297,19 +290,10 @@ func (ah *ArticleHandler) PubDetail(ctx *gin.Context) {
 			Ctime:  art.Ctime.Format(time.DateTime),
 			Utime:  art.Utime.Format(time.DateTime),
 		},
-	})
+	}, nil
 }
 
-func (ah *ArticleHandler) Like(ctx *gin.Context) {
-	type Req struct {
-		Id   int64 `json:"id"`
-		Like bool  `json:"like"`
-	}
-	var req Req
-	if err := ctx.Bind(&req); err != nil {
-		return
-	}
-	uc := ctx.MustGet("user").(jwt.UserClaims)
+func (ah *ArticleHandler) Like(ctx *gin.Context, req LikeReq, uc jwt.UserClaims) (ginx.Result, error) {
 	var err error
 	if req.Like {
 		err = ah.is.Like(ctx, ah.biz, req.Id, uc.Uid)
@@ -318,19 +302,12 @@ func (ah *ArticleHandler) Like(ctx *gin.Context) {
 	}
 
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
+		return ginx.Result{
 			Code: 5,
 			Msg:  "系统错误",
-		})
-		ah.l.Error("点赞/取消点赞失败",
-			logger.Int64("uid", uc.Uid),
-			logger.Int64("aid", req.Id),
-			logger.Error(err))
-		return
+		}, err
 	}
-	ctx.JSON(http.StatusOK, Result{
-		Msg: "OK",
-	})
+	return ginx.Result{Msg: "OK"}, nil
 }
 
 func (ah *ArticleHandler) Collect(ctx *gin.Context) {
@@ -346,7 +323,7 @@ func (ah *ArticleHandler) Collect(ctx *gin.Context) {
 
 	err := ah.is.Collect(ctx, ah.biz, req.Id, req.Cid, uc.Uid)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
+		ctx.JSON(http.StatusOK, ginx.Result{
 			Code: 5,
 			Msg:  "系统错误",
 		})
@@ -356,7 +333,12 @@ func (ah *ArticleHandler) Collect(ctx *gin.Context) {
 			logger.Error(err))
 		return
 	}
-	ctx.JSON(http.StatusOK, Result{
+	ctx.JSON(http.StatusOK, ginx.Result{
 		Msg: "OK",
 	})
+}
+
+type LikeReq struct {
+	Id   int64 `json:"id"`
+	Like bool  `json:"like"`
 }

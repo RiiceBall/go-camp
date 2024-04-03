@@ -7,12 +7,15 @@ import (
 	"webook/internal/web"
 	ijwt "webook/internal/web/jwt"
 	"webook/internal/web/middleware"
+	"webook/pkg/ginx"
+	"webook/pkg/ginx/middleware/prometheus"
 	"webook/pkg/ginx/middleware/ratelimit"
 	"webook/pkg/limiter"
 	"webook/pkg/logger"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	prometheus2 "github.com/prometheus/client_golang/prometheus"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -29,6 +32,18 @@ func InitWebServer(mdls []gin.HandlerFunc, userHdl *web.UserHandler,
 
 func InitGinMiddlewares(redisClient redis.Cmdable,
 	hdl ijwt.Handler, l logger.LoggerV1) []gin.HandlerFunc {
+	pb := &prometheus.Builder{
+		Namespace: "riiceball",
+		Subsystem: "webook",
+		Name:      "gin_http",
+		Help:      "统计 GIN 的 HTTP 接口数据",
+	}
+	ginx.InitCounter(prometheus2.CounterOpts{
+		Namespace: "riiceball",
+		Subsystem: "webook",
+		Name:      "biz_code",
+		Help:      "统计业务错误码",
+	})
 	return []gin.HandlerFunc{
 		cors.New(cors.Config{
 			AllowCredentials: true,
@@ -39,6 +54,8 @@ func InitGinMiddlewares(redisClient redis.Cmdable,
 			},
 			MaxAge: 12 * time.Hour,
 		}),
+		pb.BuildResponseTime(),
+		pb.BuildActiveRequest(),
 		ratelimit.NewBuilder(limiter.NewRedisSlidingWindowLimiter(redisClient, time.Second, 100)).Build(),
 		middleware.NewLogMiddlewareBuilder(func(ctx context.Context, al middleware.AccessLog) {
 			l.Debug("", logger.Field{Key: "req", Val: al})
