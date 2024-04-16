@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
+	"time"
+	"webook/ioc"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/gin-gonic/gin"
@@ -15,9 +18,15 @@ import (
 
 func main() {
 	initViper()
+	// initViperRemote()
 	initLogger()
 	initPrometheus()
-	// initViperRemote()
+	tpCancel := ioc.InitOTEL()
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		tpCancel(ctx)
+	}()
 	app := InitWebServer()
 	for _, c := range app.consumers {
 		err := c.Start()

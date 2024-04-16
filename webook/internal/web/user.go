@@ -184,7 +184,7 @@ func (uh *UserHandler) SignUp(ctx *gin.Context, req SignUpReq) (ginx.Result, err
 		}, nil
 	}
 
-	err = uh.userService.SignUp(ctx, domain.User{
+	err = uh.userService.SignUp(ctx.Request.Context(), domain.User{
 		Email:    req.Email,
 		Password: req.Password,
 	})
