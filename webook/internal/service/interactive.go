@@ -17,6 +17,7 @@ type InteractiveService interface {
 	CancelLike(ctx context.Context, biz string, bizId int64, uid int64) error
 	Collect(ctx context.Context, biz string, bizId, cid, uid int64) error
 	Get(ctx context.Context, biz string, bizId, uid int64) (domain.Interactive, error)
+	TopLike(ctx context.Context, biz string) ([]domain.Interactive, error)
 }
 
 type interactiveService struct {
@@ -76,4 +77,8 @@ func (is *interactiveService) Get(
 			logger.Error(err))
 	}
 	return intr, err
+}
+
+func (is *interactiveService) TopLike(ctx context.Context, biz string) ([]domain.Interactive, error) {
+	return is.ir.TopLike(ctx, biz)
 }

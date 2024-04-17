@@ -16,6 +16,7 @@ type InteractiveRepository interface {
 	Get(ctx context.Context, biz string, bizId int64) (domain.Interactive, error)
 	Liked(ctx context.Context, biz string, id int64, uid int64) (bool, error)
 	Collected(ctx context.Context, biz string, id int64, uid int64) (bool, error)
+	TopLike(ctx context.Context, biz string) ([]domain.Interactive, error)
 }
 
 type CachedInteractiveRepository struct {
@@ -126,8 +127,39 @@ func (ir *CachedInteractiveRepository) Collected(ctx context.Context, biz string
 	}
 }
 
+func (ir *CachedInteractiveRepository) TopLike(ctx context.Context, biz string) ([]domain.Interactive, error) {
+	interactives, err := ir.ic.GetTopLike(ctx, biz)
+	if err == nil {
+		return interactives, nil
+	}
+	ie, err := ir.id.TopLike(ctx, biz)
+	if err == nil {
+		res := ir.manyToDomain(ie)
+		if er := ir.ic.SetTopLike(ctx, biz, res); er != nil {
+			ir.l.Error("回写缓存失败",
+				logger.String("biz", biz),
+				logger.Error(er))
+		}
+		return res, nil
+	}
+	if err == dao.ErrDataNotFound {
+		return []domain.Interactive{}, nil
+	}
+	return []domain.Interactive{}, err
+}
+
+func (ir *CachedInteractiveRepository) manyToDomain(intrs []dao.Interactive) []domain.Interactive {
+	result := make([]domain.Interactive, len(intrs))
+	for i, v := range intrs {
+		result[i] = ir.toDomain(v)
+	}
+	return result
+}
+
 func (ir *CachedInteractiveRepository) toDomain(intr dao.Interactive) domain.Interactive {
 	return domain.Interactive{
+		Biz:        intr.Biz,
+		BizId:      intr.BizId,
 		LikeCnt:    intr.LikeCnt,
 		CollectCnt: intr.CollectCnt,
 		ReadCnt:    intr.ReadCnt,

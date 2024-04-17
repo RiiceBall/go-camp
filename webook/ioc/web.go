@@ -7,8 +7,6 @@ import (
 	"webook/internal/web"
 	ijwt "webook/internal/web/jwt"
 	"webook/internal/web/middleware"
-	"webook/pkg/ginx/middleware/ratelimit"
-	"webook/pkg/limiter"
 	"webook/pkg/logger"
 
 	"github.com/gin-contrib/cors"
@@ -39,7 +37,7 @@ func InitGinMiddlewares(redisClient redis.Cmdable,
 			},
 			MaxAge: 12 * time.Hour,
 		}),
-		ratelimit.NewBuilder(limiter.NewRedisSlidingWindowLimiter(redisClient, time.Second, 100)).Build(),
+		// ratelimit.NewBuilder(limiter.NewRedisSlidingWindowLimiter(redisClient, time.Second, 100)).Build(),
 		middleware.NewLogMiddlewareBuilder(func(ctx context.Context, al middleware.AccessLog) {
 			l.Debug("", logger.Field{Key: "req", Val: al})
 		}).AllowReqBody().AllowRespBody().Build(),

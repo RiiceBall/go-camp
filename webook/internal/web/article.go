@@ -45,6 +45,9 @@ func (ah *ArticleHandler) RegisterRoutes(server *gin.Engine) {
 	// /list?offset=?&limit=?
 	ag.POST("/list", ah.List)
 
+	// 获取点赞数前高的文章，暂定 50
+	ag.GET("/topLike", ah.TopLike)
+
 	pub := ag.Group("/pub")
 	pub.GET("/:id", ah.PubDetail)
 	pub.POST("/like", ah.Like)
@@ -180,6 +183,22 @@ func (ah *ArticleHandler) List(ctx *gin.Context) {
 				Utime:  src.Utime.Format(time.DateTime),
 			}
 		}),
+	})
+}
+
+func (ah *ArticleHandler) TopLike(ctx *gin.Context) {
+	interactives, err := ah.is.TopLike(ctx, ah.biz)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		ah.l.Error("获取点赞数前 50 高的文章列表失败", logger.Error(err))
+		return
+	}
+	// 应该要返回文章而不是交互数据
+	ctx.JSON(http.StatusOK, Result{
+		Data: interactives,
 	})
 }
 

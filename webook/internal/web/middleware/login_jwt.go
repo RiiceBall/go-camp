@@ -23,7 +23,9 @@ func (lmb *LoginJWTMiddlewareBuilder) CheckLogin() gin.HandlerFunc {
 		path := ctx.Request.URL.Path
 		if (path == "/users/signup") || (path == "/users/login") ||
 			(path == "/users/login_sms/code/send") || (path == "/users/login_sms") ||
-			(path == "/oauth2/wechat/authurl") || (path == "/oauth2/wechat/callback") {
+			(path == "/oauth2/wechat/authurl") || (path == "/oauth2/wechat/callback") ||
+			// 为了方便测试，这里不做检查
+			(path == "/articles/topLike") {
 			return
 		}
 		tokenStr := lmb.ExtractToken(ctx)

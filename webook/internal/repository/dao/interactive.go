@@ -16,6 +16,7 @@ type InteractiveDAO interface {
 	Get(ctx context.Context, biz string, bizId int64) (Interactive, error)
 	GetLikeInfo(ctx context.Context, biz string, bizId, uid int64) (UserLikeBiz, error)
 	GetCollectionInfo(ctx context.Context, biz string, bizId, uid int64) (UserCollectionBiz, error)
+	TopLike(ctx context.Context, biz string) ([]Interactive, error)
 }
 
 type GORMInteractiveDAO struct {
@@ -149,6 +150,16 @@ func (id *GORMInteractiveDAO) GetCollectionInfo(ctx context.Context, biz string,
 	return res, err
 }
 
+func (id *GORMInteractiveDAO) TopLike(ctx context.Context, biz string) ([]Interactive, error) {
+	var interactives []Interactive
+	err := id.db.WithContext(ctx).
+		Where("biz = ?", biz).
+		Order("like_cnt DESC").
+		Limit(50).
+		Find(&interactives).Error
+	return interactives, err
+}
+
 // 正常来说，一张主表和与它有关联关系的表会共用一个DAO，
 // 所以我们就用一个 DAO 来操作
 type Interactive struct {
@@ -157,7 +168,7 @@ type Interactive struct {
 	Biz        string `gorm:"type:varchar(128);uniqueIndex:biz_type_id"`
 	ReadCnt    int64
 	CollectCnt int64
-	LikeCnt    int64
+	LikeCnt    int64 `gorm:"uniqueIndex:like_count"`
 	Ctime      int64
 	Utime      int64
 }

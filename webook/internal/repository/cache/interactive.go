@@ -3,6 +3,7 @@ package cache
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"time"
@@ -29,6 +30,8 @@ type InteractiveCache interface {
 	IncrCollectCntIfPresent(ctx context.Context, biz string, bizId int64) error
 	Get(ctx context.Context, biz string, bizId int64) (domain.Interactive, error)
 	Set(ctx context.Context, biz string, bizId int64, intr domain.Interactive) error
+	GetTopLike(ctx context.Context, biz string) ([]domain.Interactive, error)
+	SetTopLike(ctx context.Context, biz string, res []domain.Interactive) error
 }
 
 type RedisInteractiveCache struct {
@@ -107,6 +110,39 @@ func (ic *RedisInteractiveCache) Set(ctx context.Context, biz string, bizId int6
 	return ic.client.Expire(ctx, key, time.Minute*15).Err()
 }
 
+func (ic *RedisInteractiveCache) GetTopLike(ctx context.Context, biz string) ([]domain.Interactive, error) {
+	key := ic.topLikeKey(biz)
+	result, err := ic.client.Get(ctx, key).Result()
+	if err != nil {
+		return []domain.Interactive{}, err
+	}
+	var data []domain.Interactive
+	// 反序列化数据
+	err = json.Unmarshal([]byte(result), &data)
+	if err != nil {
+		return []domain.Interactive{}, err
+	}
+	return data, nil
+}
+
+func (ic *RedisInteractiveCache) SetTopLike(ctx context.Context, biz string, res []domain.Interactive) error {
+	key := ic.topLikeKey(biz)
+	data, err := json.Marshal(res)
+	if err != nil {
+		return err
+	}
+	// 仅保存 5 分钟，以保持数据的实时性
+	err = ic.client.Set(ctx, key, data, time.Minute*5).Err()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (ic *RedisInteractiveCache) key(biz string, bizId int64) string {
 	return fmt.Sprintf("interactive:%s:%d", biz, bizId)
+}
+
+func (ic *RedisInteractiveCache) topLikeKey(biz string) string {
+	return fmt.Sprintf("topLike:%s", biz)
 }
