@@ -15,11 +15,17 @@ import (
 	"github.com/google/wire"
 )
 
-var interactiveSvcProvider = wire.NewSet(
+var interactiveSvcSet = wire.NewSet(
 	service.NewInteractiveService,
 	repository.NewCachedInteractiveRepository,
 	dao.NewGORMInteractiveDAO,
 	cache.NewRedisInteractiveCache,
+)
+
+var rankingSvcSet = wire.NewSet(
+	cache.NewRankingRedisCache,
+	repository.NewCachedRankingRepository,
+	service.NewBatchRankingService,
 )
 
 func InitWebServer() *App {
@@ -33,7 +39,10 @@ func InitWebServer() *App {
 		dao.NewUserDAO,
 		dao.NewArticleGORMDAO,
 
-		interactiveSvcProvider,
+		interactiveSvcSet,
+		rankingSvcSet,
+		ioc.InitJobs,
+		ioc.InitRankingJob,
 
 		article.NewSaramaSyncProducer,
 		article.NewInteractiveReadEventConsumer,

@@ -6,6 +6,7 @@ import (
 	"webook/internal/domain"
 	"webook/internal/repository"
 	repomocks "webook/internal/repository/mocks"
+	"webook/pkg/logger"
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -49,7 +50,7 @@ func TestArticleService_Publish(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
-			svc := NewArticleService(tc.mock(ctrl))
+			svc := NewArticleService(tc.mock(ctrl), nil, &logger.NopLogger{})
 			id, err := svc.Publish(context.Background(), tc.art)
 			assert.Equal(t, tc.wantErr, err)
 			assert.Equal(t, tc.wantId, id)

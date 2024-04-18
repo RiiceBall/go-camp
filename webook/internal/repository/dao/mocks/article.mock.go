@@ -12,6 +12,7 @@ package daomocks
 import (
 	context "context"
 	reflect "reflect"
+	time "time"
 	dao "webook/internal/repository/dao"
 
 	gomock "go.uber.org/mock/gomock"
@@ -98,6 +99,21 @@ func (m *MockArticleDAO) Insert(ctx context.Context, art dao.Article) (int64, er
 func (mr *MockArticleDAOMockRecorder) Insert(ctx, art any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Insert", reflect.TypeOf((*MockArticleDAO)(nil).Insert), ctx, art)
+}
+
+// ListPub mocks base method.
+func (m *MockArticleDAO) ListPub(ctx context.Context, start time.Time, offset, limit int) ([]dao.PublishedArticle, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListPub", ctx, start, offset, limit)
+	ret0, _ := ret[0].([]dao.PublishedArticle)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListPub indicates an expected call of ListPub.
+func (mr *MockArticleDAOMockRecorder) ListPub(ctx, start, offset, limit any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPub", reflect.TypeOf((*MockArticleDAO)(nil).ListPub), ctx, start, offset, limit)
 }
 
 // Sync mocks base method.

@@ -56,13 +56,19 @@ func InitWebServer() *App {
 	engine := ioc.InitWebServer(v, userHandler, articleHandler, oAuth2WechatHandler)
 	interactiveReadEventConsumer := article.NewInteractiveReadEventConsumer(client, loggerV1, interactiveRepository)
 	v2 := ioc.InitConsumers(interactiveReadEventConsumer)
+	rankingService := service.NewBatchRankingService(interactiveService, articleService)
+	rankingJob := ioc.InitRankingJob(rankingService)
+	cron := ioc.InitJobs(loggerV1, rankingJob)
 	app := &App{
 		server:    engine,
 		consumers: v2,
+		cron:      cron,
 	}
 	return app
 }
 
 // wire.go:
 
-var interactiveSvcProvider = wire.NewSet(service.NewInteractiveService, repository.NewCachedInteractiveRepository, dao.NewGORMInteractiveDAO, cache.NewRedisInteractiveCache)
+var interactiveSvcSet = wire.NewSet(service.NewInteractiveService, repository.NewCachedInteractiveRepository, dao.NewGORMInteractiveDAO, cache.NewRedisInteractiveCache)
+
+var rankingSvcSet = wire.NewSet(cache.NewRankingRedisCache, repository.NewCachedRankingRepository, service.NewBatchRankingService)

@@ -34,6 +34,13 @@ func main() {
 			panic(err)
 		}
 	}
+
+	app.cron.Start()
+	defer func() {
+		// 等待定时任务退出
+		<-app.cron.Stop().Done()
+	}()
+
 	server := app.server
 
 	server.GET("/hello", func(ctx *gin.Context) {
