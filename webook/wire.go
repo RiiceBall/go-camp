@@ -34,6 +34,7 @@ func InitWebServer() *App {
 		ioc.InitDB, ioc.InitRedis, ioc.InitLogger,
 		ioc.InitSaramaClient, ioc.InitSyncProducer,
 		ioc.InitConsumers,
+		ioc.InitRlockClient,
 
 		// DAO
 		dao.NewUserDAO,
