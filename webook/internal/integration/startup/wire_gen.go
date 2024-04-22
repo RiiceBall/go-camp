@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 	"webook/internal/events/article"
+	"webook/internal/job"
 	"webook/internal/repository"
 	"webook/internal/repository/cache"
 	"webook/internal/repository/dao"
@@ -86,6 +87,16 @@ func InitInteractiveService() service.InteractiveService {
 	return interactiveService
 }
 
+func InitJobScheduler() *job.Scheduler {
+	db := InitDB()
+	jobDAO := dao.NewGORMJobDAO(db)
+	cronJobRepository := repository.NewPreemptJobRepository(jobDAO)
+	loggerV1 := InitLogger()
+	cronJobService := service.NewCronJobService(cronJobRepository, loggerV1)
+	scheduler := job.NewScheduler(cronJobService, loggerV1)
+	return scheduler
+}
+
 // wire.go:
 
 var thirdPartySet = wire.NewSet(
@@ -99,3 +110,5 @@ var userSvcProvider = wire.NewSet(dao.NewUserDAO, cache.NewUserCache, repository
 var articlSvcProvider = wire.NewSet(repository.NewArticleRepository, cache.NewArticleRedisCache, dao.NewArticleGORMDAO, service.NewArticleService)
 
 var interactiveSvcProvider = wire.NewSet(service.NewInteractiveService, repository.NewCachedInteractiveRepository, dao.NewGORMInteractiveDAO, cache.NewRedisInteractiveCache)
+
+var jobProviderSet = wire.NewSet(service.NewCronJobService, repository.NewPreemptJobRepository, dao.NewGORMJobDAO)

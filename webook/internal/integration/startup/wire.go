@@ -4,6 +4,7 @@ package startup
 
 import (
 	"webook/internal/events/article"
+	"webook/internal/job"
 	"webook/internal/repository"
 	"webook/internal/repository/cache"
 	"webook/internal/repository/dao"
@@ -40,6 +41,11 @@ var interactiveSvcProvider = wire.NewSet(
 	dao.NewGORMInteractiveDAO,
 	cache.NewRedisInteractiveCache,
 )
+
+var jobProviderSet = wire.NewSet(
+	service.NewCronJobService,
+	repository.NewPreemptJobRepository,
+	dao.NewGORMJobDAO)
 
 func InitWebServer() *gin.Engine {
 	wire.Build(
@@ -90,4 +96,9 @@ func InitArticleHandler(dao dao.ArticleDAO) *web.ArticleHandler {
 func InitInteractiveService() service.InteractiveService {
 	wire.Build(thirdPartySet, interactiveSvcProvider)
 	return service.NewInteractiveService(nil, nil)
+}
+
+func InitJobScheduler() *job.Scheduler {
+	wire.Build(jobProviderSet, thirdPartySet, job.NewScheduler)
+	return &job.Scheduler{}
 }
