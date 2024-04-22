@@ -27,9 +27,11 @@ func (jd *GORMJobDAO) Preempt(ctx context.Context) (Job, error) {
 	for {
 		var j Job
 		now := time.Now().UnixMilli()
-		// 作业：这里是缺少找到续约失败的 JOB 出来执行
-		err := db.Where("status = ? AND next_time < ?",
-			jobStatusWaiting, now).
+		oneMinuteAgo := time.Now().Add(-1 * (time.Minute + time.Second*30)).UnixMilli()
+		// 如果运行中的任务超过 1分半没有更新过，就可以代表可以重新抢占
+		// 这个时间需要根据 cronJobService 中的 refreshInterval 来调整
+		err := db.Where("(status = ? AND next_time < ?) OR (status = ? AND utime < ?)",
+			jobStatusWaiting, now, jobStatusRunning, oneMinuteAgo).
 			First(&j).Error
 		if err != nil {
 			return j, err
