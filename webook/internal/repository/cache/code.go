@@ -19,6 +19,7 @@ var (
 	ErrCodeVerifyTooMany = errors.New("发送太频繁")
 )
 
+//go:generate mockgen -source=./code.go -package=cachemocks -destination=./mocks/code.mock.go CodeCache
 type CodeCache interface {
 	Set(ctx context.Context, biz string, phone string, code string) error
 	Verify(ctx context.Context, biz string, phone string, code string) (bool, error)
