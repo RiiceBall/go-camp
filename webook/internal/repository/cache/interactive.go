@@ -88,6 +88,7 @@ func (ic *RedisInteractiveCache) Get(ctx context.Context,
 	readCnt, _ := strconv.ParseInt(data[fieldReadCnt], 10, 64)
 
 	return domain.Interactive{
+		BizId: bizId,
 		// 懒惰的写法
 		CollectCnt: collectCnt,
 		LikeCnt:    likeCnt,

@@ -108,14 +108,14 @@ func (id *GORMInteractiveDAO) InsertCollectionBiz(ctx context.Context, cb UserCo
 	cb.Utime = now
 	cb.Ctime = now
 	return id.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		err := id.db.WithContext(ctx).Create(&cb).Error
+		err := tx.Create(&cb).Error
 		if err != nil {
 			return err
 		}
-		return tx.Clauses(clause.OnConflict{
+		return tx.WithContext(ctx).Clauses(clause.OnConflict{
 			DoUpdates: clause.Assignments(map[string]any{
-				"like_cnt": gorm.Expr("`like_cnt`+1"),
-				"utime":    now,
+				"collect_cnt": gorm.Expr("`collect_cnt`+1"),
+				"utime":       now,
 			}),
 		}).Create(&Interactive{
 			CollectCnt: 1,
@@ -154,7 +154,7 @@ func (id *GORMInteractiveDAO) GetByIds(ctx context.Context, biz string, ids []in
 	var res []Interactive
 	err := id.db.WithContext(ctx).
 		Where("biz = ? AND biz_id IN ?", biz, ids).
-		First(&res).Error
+		Find(&res).Error
 	return res, err
 }
 
