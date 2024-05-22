@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"time"
+	"webook/interactive/domain"
+)
 
 type Article struct {
 	Id      int64
@@ -10,6 +13,8 @@ type Article struct {
 	Status  ArticleStatus
 	Ctime   time.Time
 	Utime   time.Time
+
+	Intr domain.Interactive
 }
 
 func (a Article) Abstract() string {

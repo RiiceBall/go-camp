@@ -28,14 +28,17 @@ type CachedArticleRepository struct {
 	// 因为如果你直接访问 UserDAO，你就绕开了 repository，
 	// repository 一般都有一些缓存机制
 	ur UserRepository
+	ir InteractiveRepository
 }
 
 func NewArticleRepository(ad dao.ArticleDAO,
 	ur UserRepository,
+	ir InteractiveRepository,
 	ac cache.ArticleCache) ArticleRepository {
 	return &CachedArticleRepository{
 		ad: ad,
 		ur: ur,
+		ir: ir,
 		ac: ac,
 	}
 }
@@ -180,6 +183,13 @@ func (ar *CachedArticleRepository) GetPubById(ctx context.Context, id int64) (do
 		//return res, nil
 	}
 	res.Author.Name = author.Nickname
+
+	intr, err := ar.ir.Get(ctx, "article", id)
+	if err != nil {
+		return domain.Article{}, err
+	}
+	res.Intr = intr
+
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
