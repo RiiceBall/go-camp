@@ -119,7 +119,7 @@ func (rs *BatchRankingService) topN(ctx context.Context) ([]domain.Article, erro
 				if minEle.score < score {
 					_ = topN.Enqueue(ele)
 				} else {
-					_ = topN.Enqueue(ele)
+					_ = topN.Enqueue(minEle)
 				}
 			}
 		}
