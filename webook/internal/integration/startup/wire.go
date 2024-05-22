@@ -43,7 +43,9 @@ var interactiveSvcSet = wire.NewSet(
 	dao2.NewGORMInteractiveDAO,
 	cache2.NewRedisInteractiveCache,
 	repository2.NewCachedInteractiveRepository,
-	service2.NewInteractiveService)
+	service2.NewInteractiveService,
+	ioc.InitIntrClient,
+)
 
 var jobProviderSet = wire.NewSet(
 	service.NewCronJobService,
