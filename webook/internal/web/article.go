@@ -5,8 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"time"
-	domain2 "webook/interactive/domain"
-	service2 "webook/interactive/service"
+	intrv1 "webook/api/proto/gen/intr/v1"
 	"webook/internal/domain"
 	"webook/internal/service"
 	"webook/internal/web/jwt"
@@ -20,13 +19,13 @@ import (
 
 type ArticleHandler struct {
 	as  service.ArticleService
-	is  service2.InteractiveService
+	is  intrv1.InteractiveServiceClient
 	l   logger.LoggerV1
 	biz string
 }
 
 func NewArticleHandler(as service.ArticleService,
-	is service2.InteractiveService,
+	is intrv1.InteractiveServiceClient,
 	l logger.LoggerV1) *ArticleHandler {
 	return &ArticleHandler{
 		as:  as,
@@ -250,7 +249,7 @@ func (ah *ArticleHandler) PubDetail(ctx *gin.Context, uc jwt.UserClaims) (ginx.R
 	var (
 		eg   errgroup.Group
 		art  domain.Article
-		intr domain2.Interactive
+		intr *intrv1.GetResponse
 	)
 	eg.Go(func() error {
 		var er error
@@ -260,7 +259,9 @@ func (ah *ArticleHandler) PubDetail(ctx *gin.Context, uc jwt.UserClaims) (ginx.R
 
 	eg.Go(func() error {
 		var er error
-		intr, er = ah.is.Get(ctx, ah.biz, id, uc.Uid)
+		intr, er = ah.is.Get(ctx, &intrv1.GetRequest{
+			Biz: ah.biz, BizId: id, Uid: uc.Uid,
+		})
 		return er
 	})
 
@@ -282,11 +283,11 @@ func (ah *ArticleHandler) PubDetail(ctx *gin.Context, uc jwt.UserClaims) (ginx.R
 			AuthorId:   art.Author.Id,
 			AuthorName: art.Author.Name,
 
-			ReadCnt:    intr.ReadCnt,
-			CollectCnt: intr.CollectCnt,
-			LikeCnt:    intr.LikeCnt,
-			Liked:      intr.Liked,
-			Collected:  intr.Collected,
+			ReadCnt:    intr.Intr.ReadCnt,
+			CollectCnt: intr.Intr.CollectCnt,
+			LikeCnt:    intr.Intr.LikeCnt,
+			Liked:      intr.Intr.Liked,
+			Collected:  intr.Intr.Collected,
 
 			Status: art.Status.ToUint8(),
 			Ctime:  art.Ctime.Format(time.DateTime),
@@ -298,9 +299,13 @@ func (ah *ArticleHandler) PubDetail(ctx *gin.Context, uc jwt.UserClaims) (ginx.R
 func (ah *ArticleHandler) Like(ctx *gin.Context, req LikeReq, uc jwt.UserClaims) (ginx.Result, error) {
 	var err error
 	if req.Like {
-		err = ah.is.Like(ctx, ah.biz, req.Id, uc.Uid)
+		_, err = ah.is.Like(ctx, &intrv1.LikeRequest{
+			Biz: ah.biz, BizId: req.Id, Uid: uc.Uid,
+		})
 	} else {
-		err = ah.is.CancelLike(ctx, ah.biz, req.Id, uc.Uid)
+		_, err = ah.is.CancelLike(ctx, &intrv1.CancelLikeRequest{
+			Biz: ah.biz, BizId: req.Id, Uid: uc.Uid,
+		})
 	}
 
 	if err != nil {
@@ -323,7 +328,9 @@ func (ah *ArticleHandler) Collect(ctx *gin.Context) {
 	}
 	uc := ctx.MustGet("user").(jwt.UserClaims)
 
-	err := ah.is.Collect(ctx, ah.biz, req.Id, req.Cid, uc.Uid)
+	_, err := ah.is.Collect(ctx, &intrv1.CollectRequest{
+		Biz: ah.biz, BizId: req.Id, Uid: uc.Uid, Cid: req.Cid,
+	})
 	if err != nil {
 		ctx.JSON(http.StatusOK, ginx.Result{
 			Code: 5,
