@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+	domain2 "webook/interactive/domain"
+	service2 "webook/interactive/service"
 	"webook/internal/domain"
 	"webook/internal/service"
 	"webook/internal/web/jwt"
@@ -18,13 +20,13 @@ import (
 
 type ArticleHandler struct {
 	as  service.ArticleService
-	is  service.InteractiveService
+	is  service2.InteractiveService
 	l   logger.LoggerV1
 	biz string
 }
 
 func NewArticleHandler(as service.ArticleService,
-	is service.InteractiveService,
+	is service2.InteractiveService,
 	l logger.LoggerV1) *ArticleHandler {
 	return &ArticleHandler{
 		as:  as,
@@ -248,7 +250,7 @@ func (ah *ArticleHandler) PubDetail(ctx *gin.Context, uc jwt.UserClaims) (ginx.R
 	var (
 		eg   errgroup.Group
 		art  domain.Article
-		intr domain.Interactive
+		intr domain2.Interactive
 	)
 	eg.Go(func() error {
 		var er error

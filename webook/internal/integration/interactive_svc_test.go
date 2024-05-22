@@ -3,9 +3,9 @@ package integration
 import (
 	"testing"
 	"time"
-	"webook/internal/domain"
+	"webook/interactive/domain"
+	"webook/interactive/repository/dao"
 	"webook/internal/integration/startup"
-	"webook/internal/repository/dao"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"

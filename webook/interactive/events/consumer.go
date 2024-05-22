@@ -1,8 +1,8 @@
-package article
+package events
 
 import (
 	"context"
-	"webook/internal/repository"
+	"webook/interactive/repository"
 	"webook/pkg/logger"
 	"webook/pkg/saramax"
 
@@ -10,6 +10,13 @@ import (
 
 	"github.com/IBM/sarama"
 )
+
+const TopicReadEvent = "article_read"
+
+type ReadEvent struct {
+	Aid int64
+	Uid int64
+}
 
 type InteractiveReadEventConsumer struct {
 	client sarama.Client

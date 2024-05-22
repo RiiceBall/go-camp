@@ -2,9 +2,8 @@ package service
 
 import (
 	"context"
-	"webook/internal/domain"
-	"webook/internal/repository"
-	"webook/pkg/logger"
+	"webook/interactive/domain"
+	"webook/interactive/repository"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -23,14 +22,11 @@ type InteractiveService interface {
 
 type interactiveService struct {
 	ir repository.InteractiveRepository
-	l  logger.LoggerV1
 }
 
-func NewInteractiveService(ir repository.InteractiveRepository,
-	l logger.LoggerV1) InteractiveService {
+func NewInteractiveService(ir repository.InteractiveRepository) InteractiveService {
 	return &interactiveService{
 		ir: ir,
-		l:  l,
 	}
 }
 
@@ -67,17 +63,7 @@ func (is *interactiveService) Get(
 		intr.Collected, err = is.ir.Collected(ctx, biz, bizId, uid)
 		return err
 	})
-	// 说明是登录过的，补充用户是否点赞或者
-	err = eg.Wait()
-	if err != nil {
-		// 这个查询失败只需要记录日志就可以，不需要中断执行
-		is.l.Error("查询用户是否点赞的信息失败",
-			logger.String("biz", biz),
-			logger.Int64("bizId", bizId),
-			logger.Int64("uid", uid),
-			logger.Error(err))
-	}
-	return intr, err
+	return intr, eg.Wait()
 }
 
 func (is *interactiveService) GetByIds(ctx context.Context,

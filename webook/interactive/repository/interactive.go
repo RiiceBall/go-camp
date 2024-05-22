@@ -2,9 +2,9 @@ package repository
 
 import (
 	"context"
-	"webook/internal/domain"
-	"webook/internal/repository/cache"
-	"webook/internal/repository/dao"
+	"webook/interactive/domain"
+	"webook/interactive/repository/cache"
+	"webook/interactive/repository/dao"
 	"webook/pkg/logger"
 
 	"github.com/ecodeclub/ekit/slice"
@@ -99,7 +99,7 @@ func (ir *CachedInteractiveRepository) Get(ctx context.Context,
 		}
 		return res, nil
 	}
-	if err == dao.ErrDataNotFound {
+	if err == dao.ErrRecordNotFound {
 		return domain.Interactive{}, nil
 	}
 	return domain.Interactive{}, err
@@ -110,7 +110,7 @@ func (ir *CachedInteractiveRepository) Liked(ctx context.Context, biz string, id
 	switch err {
 	case nil:
 		return true, nil
-	case dao.ErrDataNotFound:
+	case dao.ErrRecordNotFound:
 		return false, nil
 	default:
 		return false, err
@@ -122,7 +122,7 @@ func (ir *CachedInteractiveRepository) Collected(ctx context.Context, biz string
 	switch err {
 	case nil:
 		return true, nil
-	case dao.ErrDataNotFound:
+	case dao.ErrRecordNotFound:
 		return false, nil
 	default:
 		return false, err

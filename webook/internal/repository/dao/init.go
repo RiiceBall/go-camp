@@ -8,9 +8,6 @@ func InitTables(db *gorm.DB) error {
 		&User{},
 		&Article{},
 		&PublishedArticle{},
-		&Interactive{},
-		&UserLikeBiz{},
-		&UserCollectionBiz{},
 		&Job{},
 	)
 }

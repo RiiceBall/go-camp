@@ -3,6 +3,10 @@
 package startup
 
 import (
+	repository2 "webook/interactive/repository"
+	cache2 "webook/interactive/repository/cache"
+	dao2 "webook/interactive/repository/dao"
+	service2 "webook/interactive/service"
 	"webook/internal/events/article"
 	"webook/internal/job"
 	"webook/internal/repository"
@@ -35,12 +39,11 @@ var articlSvcProvider = wire.NewSet(
 	dao.NewArticleGORMDAO,
 	service.NewArticleService)
 
-var interactiveSvcProvider = wire.NewSet(
-	service.NewInteractiveService,
-	repository.NewCachedInteractiveRepository,
-	dao.NewGORMInteractiveDAO,
-	cache.NewRedisInteractiveCache,
-)
+var interactiveSvcSet = wire.NewSet(
+	dao2.NewGORMInteractiveDAO,
+	cache2.NewRedisInteractiveCache,
+	repository2.NewCachedInteractiveRepository,
+	service2.NewInteractiveService)
 
 var jobProviderSet = wire.NewSet(
 	service.NewCronJobService,
@@ -52,7 +55,7 @@ func InitWebServer() *gin.Engine {
 		thirdPartySet,
 		userSvcProvider,
 		articlSvcProvider,
-		interactiveSvcProvider,
+		interactiveSvcSet,
 
 		// Cache
 		cache.NewCodeCache,
@@ -84,7 +87,7 @@ func InitArticleHandler(dao dao.ArticleDAO) *web.ArticleHandler {
 	wire.Build(
 		thirdPartySet,
 		userSvcProvider,
-		interactiveSvcProvider,
+		interactiveSvcSet,
 		service.NewArticleService,
 		cache.NewArticleRedisCache,
 		web.NewArticleHandler,
@@ -93,9 +96,9 @@ func InitArticleHandler(dao dao.ArticleDAO) *web.ArticleHandler {
 	return &web.ArticleHandler{}
 }
 
-func InitInteractiveService() service.InteractiveService {
-	wire.Build(thirdPartySet, interactiveSvcProvider)
-	return service.NewInteractiveService(nil, nil)
+func InitInteractiveService() service2.InteractiveService {
+	wire.Build(thirdPartySet, interactiveSvcSet)
+	return service2.NewInteractiveService(nil)
 }
 
 func InitJobScheduler() *job.Scheduler {

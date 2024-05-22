@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"time"
-	"webook/internal/domain"
+	"webook/interactive/domain"
 
 	"github.com/redis/go-redis/v9"
 )

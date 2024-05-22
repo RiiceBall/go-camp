@@ -3,6 +3,11 @@
 package main
 
 import (
+	"webook/interactive/events"
+	repository2 "webook/interactive/repository"
+	cache2 "webook/interactive/repository/cache"
+	dao2 "webook/interactive/repository/dao"
+	service2 "webook/interactive/service"
 	"webook/internal/events/article"
 	"webook/internal/repository"
 	"webook/internal/repository/cache"
@@ -16,10 +21,10 @@ import (
 )
 
 var interactiveSvcSet = wire.NewSet(
-	service.NewInteractiveService,
-	repository.NewCachedInteractiveRepository,
-	dao.NewGORMInteractiveDAO,
-	cache.NewRedisInteractiveCache,
+	dao2.NewGORMInteractiveDAO,
+	cache2.NewRedisInteractiveCache,
+	repository2.NewCachedInteractiveRepository,
+	service2.NewInteractiveService,
 )
 
 var rankingSvcSet = wire.NewSet(
@@ -46,7 +51,7 @@ func InitWebServer() *App {
 		ioc.InitRankingJob,
 
 		article.NewSaramaSyncProducer,
-		article.NewInteractiveReadEventConsumer,
+		events.NewInteractiveReadEventConsumer,
 
 		// Cache
 		cache.NewCodeCache, cache.NewUserCache,
