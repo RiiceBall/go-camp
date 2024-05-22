@@ -1,4 +1,4 @@
-PHONY: docker_build mock
+PHONY: docker_build mock grpc
 
 docker_build:
 	@rm webook || true
@@ -11,3 +11,6 @@ mock:
 	@mockgen -package=redismocks -destination=./internal/repository/cache/redismocks/cmd.mock.go github.com/redis/go-redis/v9 Cmdable
 	@go generate ./...
 	@go mod tidy
+
+grpc:
+	@buf generate api/proto
