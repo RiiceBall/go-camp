@@ -73,6 +73,25 @@ func WrapReq[Req any](fn func(*gin.Context, Req) (Result, error)) gin.HandlerFun
 	}
 }
 
+func WrapBody[Req any](
+	bizFn func(ctx *gin.Context, req Req) (Result, error),
+) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var req Req
+		if err := ctx.Bind(&req); err != nil {
+			log.Error("输入错误", logger.Error(err))
+			return
+		}
+		log.Debug("输入参数", logger.Field{Key: "req", Val: req})
+		res, err := bizFn(ctx, req)
+		vector.WithLabelValues(strconv.Itoa(res.Code)).Inc()
+		if err != nil {
+			log.Error("执行业务逻辑失败", logger.Error(err))
+		}
+		ctx.JSON(http.StatusOK, res)
+	}
+}
+
 // WrapClaims 复制粘贴
 func WrapClaims(fn func(*gin.Context, jwt.UserClaims) (Result, error)) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
@@ -95,6 +114,22 @@ func WrapClaims(fn func(*gin.Context, jwt.UserClaims) (Result, error)) gin.Handl
 		res, err := fn(ctx, claims)
 		if err != nil {
 			log.Error("执行业务逻辑失败",
+				logger.Error(err))
+		}
+		vector.WithLabelValues(strconv.Itoa(res.Code)).Inc()
+		ctx.JSON(http.StatusOK, res)
+	}
+}
+
+func Wrap(fn func(ctx *gin.Context) (Result, error)) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		res, err := fn(ctx)
+		if err != nil {
+			// 开始处理 error，其实就是记录一下日志
+			log.Error("处理业务逻辑出错",
+				logger.String("path", ctx.Request.URL.Path),
+				// 命中的路由
+				logger.String("route", ctx.FullPath()),
 				logger.Error(err))
 		}
 		vector.WithLabelValues(strconv.Itoa(res.Code)).Inc()

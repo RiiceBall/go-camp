@@ -3,6 +3,7 @@ package ioc
 import (
 	dao2 "webook/interactive/repository/dao"
 	"webook/pkg/gormx"
+	"webook/pkg/gormx/connpool"
 	"webook/pkg/logger"
 
 	prometheus2 "github.com/prometheus/client_golang/prometheus"
@@ -13,14 +14,39 @@ import (
 	"gorm.io/plugin/prometheus"
 )
 
-func InitDB(l logger.LoggerV1) *gorm.DB {
+type SrcDB *gorm.DB
+type DstDB *gorm.DB
+
+func InitSrcDB() SrcDB {
+	return initDB("src")
+}
+
+func InitDstDB() DstDB {
+	return initDB("dst")
+}
+
+func InitDoubleWritePool(src SrcDB, dst DstDB, l logger.LoggerV1) *connpool.DoubleWritePool {
+	return connpool.NewDoubleWritePool(src, dst, l)
+}
+
+func InitBizDB(p *connpool.DoubleWritePool) *gorm.DB {
+	doubleWrite, err := gorm.Open(mysql.New(mysql.Config{
+		Conn: p,
+	}))
+	if err != nil {
+		panic(err)
+	}
+	return doubleWrite
+}
+
+func initDB(key string) *gorm.DB {
 	type Config struct {
 		DSN string `yaml:"dsn"`
 	}
 	var cfg Config = Config{
 		DSN: "root:root@tcp(localhost:3306)/webook",
 	}
-	err := viper.UnmarshalKey("db", &cfg)
+	err := viper.UnmarshalKey("db."+key, &cfg)
 	if err != nil {
 		panic(err)
 	}
@@ -29,7 +55,7 @@ func InitDB(l logger.LoggerV1) *gorm.DB {
 		panic(err)
 	}
 	err = db.Use(prometheus.New(prometheus.Config{
-		DBName:          "webook",
+		DBName:          "webook" + key,
 		RefreshInterval: 15,
 		MetricsCollector: []prometheus.MetricsCollector{
 			&prometheus.MySQL{
@@ -43,7 +69,7 @@ func InitDB(l logger.LoggerV1) *gorm.DB {
 	cb := gormx.NewCallbacks(prometheus2.SummaryOpts{
 		Namespace: "geektime_daming",
 		Subsystem: "webook",
-		Name:      "gorm_db",
+		Name:      "gorm_db_" + key,
 		Help:      "统计 GORM 的数据库查询",
 		ConstLabels: map[string]string{
 			"instance_id": "my_instance",
@@ -63,7 +89,7 @@ func InitDB(l logger.LoggerV1) *gorm.DB {
 	}
 
 	err = db.Use(tracing.NewPlugin(tracing.WithoutMetrics(),
-		tracing.WithDBName("webook")))
+		tracing.WithDBName("webook_"+key)))
 	if err != nil {
 		panic(err)
 	}

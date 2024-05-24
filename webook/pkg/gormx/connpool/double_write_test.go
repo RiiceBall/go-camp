@@ -1,14 +1,15 @@
 package connpool
 
 import (
-	"gitee.com/geekbang/basic-go/webook/pkg/logger"
+	"testing"
+	"webook/pkg/logger"
+
 	"github.com/ecodeclub/ekit/syncx/atomicx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	"testing"
 )
 
 type DoubleWriteTestSuite struct {

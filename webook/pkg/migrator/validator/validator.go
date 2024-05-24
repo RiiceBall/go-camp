@@ -21,6 +21,23 @@ type Validator[T migrator.Entity] struct {
 	producer  events.Producer
 	direction string
 	batchSize int
+	utime     int64
+	// <= 0 就认为中断
+	// > 0 就认为睡眠
+	sleepInterval time.Duration
+	fromBase      func(ctx context.Context, offset int) (T, error)
+}
+
+func NewValidator[T migrator.Entity](
+	base *gorm.DB,
+	target *gorm.DB,
+	direction string,
+	l logger.LoggerV1,
+	p events.Producer) *Validator[T] {
+	res := &Validator[T]{base: base, target: target,
+		l: l, producer: p, direction: direction, batchSize: 100}
+	res.fromBase = res.fullFromBase
+	return res
 }
 
 func (v *Validator[T]) Validate(ctx context.Context) error {
@@ -41,20 +58,26 @@ func (v *Validator[T]) Validate(ctx context.Context) error {
 }
 
 func (v *Validator[T]) validateBaseToTarget(ctx context.Context) error {
-	offset := -1
+	offset := 0
 	for {
-		// 进来就检测负载
-		offset++
-		var src T
-		err := v.base.WithContext(ctx).Order("id").Offset(offset).First(&src).Error
-		if err == gorm.ErrRecordNotFound {
-			// 这个就是咩有数据
+		src, err := v.fromBase(ctx, offset)
+		if err == context.DeadlineExceeded || err == context.Canceled {
 			return nil
+		}
+		if err == gorm.ErrRecordNotFound {
+			// 你增量校验，要考虑一直运行的
+			// 这个就是咩有数据
+			if v.sleepInterval <= 0 {
+				return nil
+			}
+			time.Sleep(v.sleepInterval)
+			continue
 		}
 		if err != nil {
 			// 查询出错了
 			v.l.Error("base -> target 查询 base 失败", logger.Error(err))
 			// 在这里，
+			offset++
 			continue
 		}
 
@@ -81,22 +104,71 @@ func (v *Validator[T]) validateBaseToTarget(ctx context.Context) error {
 				logger.Int64("id", src.ID()),
 				logger.Error(err))
 		}
+		offset++
 	}
 }
 
+func (v *Validator[T]) Full() *Validator[T] {
+	v.fromBase = v.fullFromBase
+	return v
+}
+
+func (v *Validator[T]) Incr() *Validator[T] {
+	v.fromBase = v.incrFromBase
+	return v
+}
+
+func (v *Validator[T]) Utime(t int64) *Validator[T] {
+	v.utime = t
+	return v
+}
+
+func (v *Validator[T]) SleepInterval(interval time.Duration) *Validator[T] {
+	v.sleepInterval = interval
+	return v
+}
+
+func (v *Validator[T]) fullFromBase(ctx context.Context, offset int) (T, error) {
+	dbCtx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	var src T
+	err := v.base.WithContext(dbCtx).Order("id").
+		Offset(offset).First(&src).Error
+	return src, err
+}
+
+func (v *Validator[T]) incrFromBase(ctx context.Context, offset int) (T, error) {
+	dbCtx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	var src T
+	err := v.base.WithContext(dbCtx).
+		Where("utime > ?", v.utime).
+		Order("utime").
+		Offset(offset).First(&src).Error
+	return src, err
+}
+
 func (v *Validator[T]) validateTargetToBase(ctx context.Context) error {
-	offset := -v.batchSize
+	offset := 0
 	for {
-		offset += v.batchSize
 		var ts []T
 		err := v.target.WithContext(ctx).Select("id").
+			//Where("utime > ?", v.utime).
 			Order("id").Offset(offset).Limit(v.batchSize).
 			Find(&ts).Error
-		if err == gorm.ErrRecordNotFound || len(ts) == 0 {
+		if err == context.DeadlineExceeded || err == context.Canceled {
 			return nil
+		}
+		if err == gorm.ErrRecordNotFound || len(ts) == 0 {
+			if v.sleepInterval <= 0 {
+				return nil
+			}
+			time.Sleep(v.sleepInterval)
+			continue
 		}
 		if err != nil {
 			v.l.Error("target => base 查询 target 失败", logger.Error(err))
+			offset += len(ts)
 			continue
 		}
 		// 在这里
@@ -109,12 +181,14 @@ func (v *Validator[T]) validateTargetToBase(ctx context.Context) error {
 		if err == gorm.ErrRecordNotFound || len(srcTs) == 0 {
 			// 都代表。base 里面一条对应的数据都没有
 			v.notifyBaseMissing(ts)
+			offset += len(ts)
 			continue
 		}
 		if err != nil {
 			v.l.Error("target => base 查询 base 失败", logger.Error(err))
 			// 保守起见，我都认为 base 里面没有数据
 			// v.notifyBaseMissing(ts)
+			offset += len(ts)
 			continue
 		}
 		// 找差集，diff 里面的，就是 target 有，但是 base 没有的
@@ -124,8 +198,12 @@ func (v *Validator[T]) validateTargetToBase(ctx context.Context) error {
 		v.notifyBaseMissing(diff)
 		// 说明也没了
 		if len(ts) < v.batchSize {
-			return nil
+			if v.sleepInterval <= 0 {
+				return nil
+			}
+			time.Sleep(v.sleepInterval)
 		}
+		offset += len(ts)
 	}
 }
 
@@ -143,8 +221,10 @@ func (v *Validator[T]) notify(id int64, typ string) {
 		Type:      typ,
 		Direction: v.direction,
 	})
-	v.l.Error("发送不一致消息失败",
-		logger.Error(err),
-		logger.String("type", typ),
-		logger.Int64("id", id))
+	if err != nil {
+		v.l.Error("发送不一致消息失败",
+			logger.Error(err),
+			logger.String("type", typ),
+			logger.Int64("id", id))
+	}
 }

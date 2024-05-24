@@ -3,6 +3,7 @@ package dao
 import (
 	"context"
 	"time"
+	"webook/pkg/migrator"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -156,6 +157,18 @@ func (id *GORMInteractiveDAO) GetByIds(ctx context.Context, biz string, ids []in
 		Where("biz = ? AND biz_id IN ?", biz, ids).
 		Find(&res).Error
 	return res, err
+}
+
+func (i Interactive) ID() int64 {
+	return i.Id
+}
+
+func (i Interactive) CompareTo(dst migrator.Entity) bool {
+	val, ok := dst.(Interactive)
+	if !ok {
+		return false
+	}
+	return i == val
 }
 
 // 正常来说，一张主表和与它有关联关系的表会共用一个DAO，
