@@ -60,13 +60,14 @@ func (v *Validator[T]) Validate(ctx context.Context) error {
 func (v *Validator[T]) validateBaseToTarget(ctx context.Context) error {
 	offset := 0
 	for {
-		src, err := v.fromBase(ctx, offset)
+		var srcBatch []T
+		err := v.base.WithContext(ctx).Order("id").
+			Offset(offset).Limit(v.batchSize).
+			Find(&srcBatch).Error
 		if err == context.DeadlineExceeded || err == context.Canceled {
 			return nil
 		}
-		if err == gorm.ErrRecordNotFound {
-			// 你增量校验，要考虑一直运行的
-			// 这个就是咩有数据
+		if err == gorm.ErrRecordNotFound || len(srcBatch) == 0 {
 			if v.sleepInterval <= 0 {
 				return nil
 			}
@@ -74,37 +75,42 @@ func (v *Validator[T]) validateBaseToTarget(ctx context.Context) error {
 			continue
 		}
 		if err != nil {
-			// 查询出错了
 			v.l.Error("base -> target 查询 base 失败", logger.Error(err))
-			// 在这里，
-			offset++
+			offset += len(srcBatch)
 			continue
 		}
 
-		// 这边就是正常情况
-		var dst T
-		err = v.target.WithContext(ctx).
-			Where("id = ?", src.ID()).
-			First(&dst).Error
-		switch err {
-		case gorm.ErrRecordNotFound:
-			// target 没有
-			// 丢一条消息到 Kafka 上
-			v.notify(src.ID(), events.InconsistentEventTypeTargetMissing)
-		case nil:
-			equal := src.CompareTo(dst)
-			if !equal {
-				// 要丢一条消息到 Kafka 上
-				v.notify(src.ID(), events.InconsistentEventTypeNEQ)
-			}
-		default:
-			// 记录日志，然后继续
-			// 做好监控
-			v.l.Error("base -> target 查询 target 失败",
-				logger.Int64("id", src.ID()),
-				logger.Error(err))
+		var dstBatch []T
+		ids := slice.Map(srcBatch, func(idx int, t T) int64 {
+			return t.ID()
+		})
+		err = v.base.WithContext(ctx).
+			Where("id IN ?", ids).
+			Find(&dstBatch).Error
+		if err == gorm.ErrRecordNotFound || len(dstBatch) == 0 {
+			v.notifyTargetMissing(srcBatch)
+			offset += len(srcBatch)
+			continue
 		}
-		offset++
+		if err != nil {
+			v.l.Error("base -> target 查询 target 失败",
+				logger.Error(err))
+			offset += len(srcBatch)
+			continue
+		}
+
+		diff := slice.DiffSetFunc(srcBatch, dstBatch, func(src, dst T) bool {
+			return src.CompareTo(dst)
+		})
+		v.notifyTargetMissing(diff)
+
+		if len(srcBatch) < v.batchSize {
+			if v.sleepInterval <= 0 {
+				return nil
+			}
+			time.Sleep(v.sleepInterval)
+		}
+		offset += len(srcBatch)
 	}
 }
 
@@ -210,6 +216,12 @@ func (v *Validator[T]) validateTargetToBase(ctx context.Context) error {
 func (v *Validator[T]) notifyBaseMissing(ts []T) {
 	for _, val := range ts {
 		v.notify(val.ID(), events.InconsistentEventTypeBaseMissing)
+	}
+}
+
+func (v *Validator[T]) notifyTargetMissing(srcBatch []T) {
+	for _, val := range srcBatch {
+		v.notify(val.ID(), events.InconsistentEventTypeTargetMissing)
 	}
 }
 
