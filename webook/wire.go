@@ -3,7 +3,6 @@
 package main
 
 import (
-	"webook/interactive/events"
 	repository2 "webook/interactive/repository"
 	cache2 "webook/interactive/repository/cache"
 	dao2 "webook/interactive/repository/dao"
@@ -40,18 +39,19 @@ func InitWebServer() *App {
 		ioc.InitSaramaClient, ioc.InitSyncProducer,
 		ioc.InitConsumers,
 		ioc.InitRlockClient,
+		ioc.InitEtcd,
 
 		// DAO
 		dao.NewUserDAO,
 		dao.NewArticleGORMDAO,
 
-		interactiveSvcSet,
+		// interactiveSvcSet,
 		rankingSvcSet,
 		ioc.InitJobs,
 		ioc.InitRankingJob,
 
 		article.NewSaramaSyncProducer,
-		events.NewInteractiveReadEventConsumer,
+		// events.NewInteractiveReadEventConsumer,
 
 		// Cache
 		cache.NewCodeCache, cache.NewUserCache,
@@ -64,7 +64,8 @@ func InitWebServer() *App {
 		// Service
 		ioc.InitSMSService,
 		ioc.InitWechatService,
-		ioc.InitIntrClient,
+		// ioc.InitIntrClient,
+		ioc.InitIntrClientV1,
 		service.NewUserService,
 		service.NewCodeService,
 		service.NewArticleService,
