@@ -65,7 +65,7 @@ func (s *BalancerTestSuite) TestFailoverClient() {
 		grpc.WithResolvers(etcdResolver),
 		grpc.WithDefaultServiceConfig(`
 {
-  "loadBalancingConfig": [{"round_robin": {}}],
+  "loadBalancingConfig": [{"custom_weighted_round_robin": {}}],
   "methodConfig":  [
     {
       "name": [{"service":  "UserService"}],

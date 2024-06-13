@@ -64,6 +64,8 @@ func (p *Picker) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
 	return balancer.PickResult{
 		SubConn: maxCC.SubConn,
 		Done: func(info balancer.DoneInfo) {
+			p.lock.Lock()
+			defer p.lock.Unlock()
 			// 作业
 			// 要在这里进一步调整weight/currentWeight
 			// failover 要在这里做文章
@@ -73,6 +75,15 @@ func (p *Picker) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
 			// 1.2 你可以考虑直接将 weight/currentWeight 调整到极低
 			// 2. 触发了熔断呢？
 			// 3. 降级呢？
+			if info.Err != nil {
+				// 如果失败了，就将权重降为负的总权重的两倍，确保短时间内不会被选中
+				maxCC.currentWeight = -total * 2
+				return
+			}
+			// 如果成功了，并且当前权重小于总权重的两倍，就额外增加总权重的 10%
+			if maxCC.currentWeight < total*2 {
+				maxCC.currentWeight += (total / 10)
+			}
 		},
 	}, nil
 }
