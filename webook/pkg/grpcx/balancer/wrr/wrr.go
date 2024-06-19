@@ -2,9 +2,12 @@ package wrr
 
 import (
 	"sync"
+	"time"
 
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/balancer/base"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 const Name = "custom_weighted_round_robin"
@@ -27,9 +30,11 @@ func (p *PickerBuilder) Build(info base.PickerBuildInfo) balancer.Picker {
 		weightVal, _ := md["weight"]
 		weight, _ := weightVal.(float64)
 		conns = append(conns, &weightConn{
-			SubConn:       sc,
-			weight:        int(weight),
-			currentWeight: int(weight),
+			SubConn:         sc,
+			weight:          int(weight),
+			currentWeight:   int(weight),
+			efficientWeight: int(weight),
+			available:       true,
 		})
 	}
 	return &Picker{
@@ -52,27 +57,56 @@ func (p *Picker) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
 	var total int
 	var maxCC *weightConn
 	for _, c := range p.conns {
-		total += c.weight
-		c.currentWeight += c.weight
-		if maxCC == nil || c.currentWeight > maxCC.currentWeight {
+		if !c.available {
+			continue
+		}
+		c.mutex.Lock()
+		total = total + c.weight
+		c.currentWeight = c.currentWeight + c.efficientWeight
+		if maxCC == nil || maxCC.currentWeight < c.currentWeight {
 			maxCC = c
 		}
+		c.mutex.Unlock()
 	}
-
-	maxCC.currentWeight -= total
+	maxCC.mutex.Lock()
+	maxCC.currentWeight = maxCC.currentWeight - total
+	maxCC.mutex.Unlock()
 
 	return balancer.PickResult{
 		SubConn: maxCC.SubConn,
 		Done: func(info balancer.DoneInfo) {
-			// 作业
-			// 要在这里进一步调整weight/currentWeight
-			// failover 要在这里做文章
-			// 根据调用结果的具体错误信息进行容错
-			// 1. 如果要是触发了限流了，
-			// 1.1 你可以考虑直接挪走这个节点，后面再挪回来
-			// 1.2 你可以考虑直接将 weight/currentWeight 调整到极低
-			// 2. 触发了熔断呢？
-			// 3. 降级呢？
+			maxCC.mutex.Lock()
+			defer maxCC.mutex.Unlock()
+			if info.Err == nil {
+				// 如果成功了，并且当前有效权重小于总权重，就额外增加总权重的 10%
+				if maxCC.efficientWeight < total {
+					maxCC.efficientWeight += (total / 10)
+				}
+				return
+			}
+			code := status.Code(info.Err)
+			switch code {
+			case codes.Unavailable:
+				// 触发熔断
+				maxCC.available = false
+				go func() {
+					// 5 秒后恢复
+					time.Sleep(5 * time.Second)
+					maxCC.mutex.Lock()
+					maxCC.available = true
+					// 降低有效权重避免恢复后立刻被太多请求搞的再次熔断
+					maxCC.efficientWeight = maxCC.weight / 10
+					maxCC.mutex.Unlock()
+				}()
+			default:
+				// 其他错误默认为限流
+				// 降低有效权重
+				maxCC.efficientWeight -= (total / 10)
+				// 有效权重不能小于 1
+				if maxCC.efficientWeight < 1 {
+					maxCC.efficientWeight = 1
+				}
+			}
 		},
 	}, nil
 }
@@ -80,6 +114,11 @@ func (p *Picker) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
 type weightConn struct {
 	balancer.SubConn
 
-	weight        int
-	currentWeight int
+	mutex sync.Mutex
+
+	weight          int
+	currentWeight   int
+	efficientWeight int
+
+	available bool
 }
