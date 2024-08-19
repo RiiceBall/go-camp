@@ -2,14 +2,15 @@ package service
 
 import (
 	"context"
+	"sort"
+	"sync"
+	"time"
+
 	followv1 "gitee.com/geekbang/basic-go/webook/api/proto/gen/follow/v1"
 	"gitee.com/geekbang/basic-go/webook/feed/domain"
 	"gitee.com/geekbang/basic-go/webook/feed/repository"
 	"github.com/ecodeclub/ekit/slice"
 	"golang.org/x/sync/errgroup"
-	"sort"
-	"sync"
-	"time"
 )
 
 type ArticleEventHandler struct {
@@ -37,6 +38,11 @@ func (h *ArticleEventHandler) FindFeedEvents(ctx context.Context, uid, timestamp
 	var lock sync.Mutex
 	events := make([]domain.FeedEvent, 0, limit*2)
 	eg.Go(func() error {
+		// 如果一个用户是活跃用户，那么他的数据必然在收件箱里面，就没有必须再去查询了
+		if h.isActiveUser(uid) {
+			return nil
+		}
+
 		// 查询发件箱
 		resp, err := h.followClient.GetFollowee(ctx, &followv1.GetFolloweeRequest{Follower: uid, Limit: 10000})
 		if err != nil {
@@ -90,6 +96,27 @@ func (h *ArticleEventHandler) CreateFeedEvent(ctx context.Context, ext domain.Ex
 
 	// 大于一个阈值
 	if resp.FollowStatic.Followers > threshold {
+		// 对活跃的用户进行写扩散
+		fresp, err := h.followClient.GetFollower(ctx, &followv1.GetFollowerRequest{Followee: uid})
+		if err != nil {
+			return err
+		}
+		events := slice.Map(fresp.FollowRelations, func(idx int, src *followv1.FollowRelation) domain.FeedEvent {
+			if h.isActiveUser(src.Follower) {
+				return domain.FeedEvent{Uid: src.Follower, Ctime: time.Now(), Type: ArticleEventName, Ext: ext}
+			} else {
+				return domain.FeedEvent{}
+			}
+		})
+		// 过滤掉空的 FeedEvent
+		filteredEvents := slice.FilterDelete(events, func(idx int, event domain.FeedEvent) bool {
+			return len(event.Ext) == 0
+		})
+		err = h.repo.CreatePushEvents(ctx, filteredEvents)
+		if err != nil {
+			return err
+		}
+
 		// 拉模型
 		return h.repo.CreatePullEvent(ctx, domain.FeedEvent{Uid: uid,
 			Type:  ArticleEventName,
@@ -107,4 +134,12 @@ func (h *ArticleEventHandler) CreateFeedEvent(ctx context.Context, ext domain.Ex
 		})
 		return h.repo.CreatePushEvents(ctx, events)
 	}
+}
+
+func (h *ArticleEventHandler) isActiveUser(uid int64) bool {
+	// 判断一个用户是否是活跃用户，查看用户在过去一周内的行为，如果同时都满足则判断为活跃用户
+	// 1. 是否多次登录过
+	// 2. 是否在网站上进行过多次操作（比如是个视频网站的话是否看过视频）
+	// 3. 是否浏览过动态页面
+	return false
 }
